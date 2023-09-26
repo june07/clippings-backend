@@ -72,7 +72,7 @@ jobs:
 
       - name: Deploy to Production
         run: |
-          ssh will@k8s-deployment.june07.com ~/${GITHUB_REPOSITORY}/update-service.sh ghcr.io/${GITHUB_REPOSITORY}:api-${GITHUB_SHA} jc-backend_node
+          ssh will@k8s-deployment.june07.com ~/$GITHUB_REPOSITORY/update-service.sh ghcr.io/$GITHUB_REPOSITORY:api-$GITHUB_SHA jc-backend_node
         env:
-          GITHUB_REPOSITORY: ${{ env.GITHUB_REPOSITORY }}
-          GITHUB_SHA: ${{ env.GITHUB_SHA }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
