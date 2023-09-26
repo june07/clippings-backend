@@ -8,7 +8,6 @@ const config = require('./config/config')
 const httpStatus = require('http-status')
 const ioRouter = require('./routes/v1/io.routes')
 const fs = require('fs')
-const routes = require('./routes/v1')
 const { ApiError } = require('./utils')
 
 const server = https.createServer({
@@ -39,8 +38,6 @@ app.use((req, _res, next) => {
     req.io = io
     next()
 })
-// v1 api routes
-app.use('/v1', routes)
 
 // send back a 404 error for any unknown api request
 app.use((req, res, next) => {
