@@ -44,8 +44,8 @@ jobs:
           file: ./Dockerfile # Path to your Dockerfile
           push: true # Push the Docker image
           tags: |
-            ghcr.io/${{ GITHUB_REPOSITORY }}:api-${{ github.sha }}
-            ghcr.io/${{ GITHUB_REPOSITORY }}:api-latest
+            ghcr.io/${{ env.GITHUB_REPOSITORY }}:api-${{ env.GITHUB_SHA }}
+            ghcr.io/${{ env.GITHUB_REPOSITORY }}:api-latest
 
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
@@ -59,7 +59,7 @@ jobs:
       - name: SSH Key Setup
         run: |
           mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          echo "{{ env.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H k8s-deployment.june07.com >> ~/.ssh/known_hosts
 
