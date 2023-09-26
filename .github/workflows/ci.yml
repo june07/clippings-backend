@@ -1,0 +1,68 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+  build_node:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Build and push Docker image
+        id: docker_build
+        uses: docker/build-push-action@v2
+        with:
+          context: . # Path to the Docker build context
+          file: ./Dockerfile # Path to your Dockerfile
+          push: true # Push the Docker image
+          tags: |
+            ghcr.io/$GITHUB_REPOSITORY:api-${GITHUB_SHA::8}
+            ghcr.io/$GITHUB_REPOSITORY:api-latest
+
+      - name: Image digest
+        run: echo ${{ steps.docker_build.outputs.digest }}
+
+  production_deploy_api:
+    needs: build_node
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.job }}
+    steps:
+      - name: SSH Key Setup
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H k8s-deployment.june07.com >> ~/.ssh/known_hosts
+
+      - name: Deploy to Production
+        run: |
+          ssh will@k8s-deployment.june07.com ~/$GITHUB_REPOSITORY/update-service.sh ghcr.io/${{ $GITHUB_REPOSITORY }}:api-${{ github.sha }} stackName-strap_node

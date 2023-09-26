@@ -1,0 +1,21 @@
+version: '3'
+
+services:
+  node-app:
+    container_name: node-june07-dev
+    command: npm run dev
+    user: root
+    ports:
+      - '9247:9229'
+      - '3000:3000'
+      
+  redis:
+    image: redis/redis-stack
+    volumes:
+      - ./redis:/data
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - target: 8001
+        published: 8001
+        protocol: tcp
+        mode: ingress

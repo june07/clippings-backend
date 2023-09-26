@@ -1,0 +1,36 @@
+version: '3'
+
+services:
+  node-app:
+    build: .
+    image: node-app
+    env_file: .env
+    environment:
+      - DD_AGENT_HOST=datadog      
+    volumes:
+      - .:/usr/src/node-app
+    
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:latest
+    volumes:
+      - ./redis:/data
+    labels:
+      com.datadoghq.tags.env: "development"
+      com.datadoghq.tags.service: "jc-backend_redis"
+      com.datadoghq.ad.check_names: '["redisdb"]'
+      com.datadoghq.ad.init_configs: '[{}]'
+
+#  datadog:
+#    image: datadog/agent
+#    environment:
+#     - DD_API_KEY=${DD_API_KEY}
+#     - DD_SITE=datadoghq.com
+#    volumes:
+#     - /var/run/docker.sock:/var/run/docker.sock
+#     - /proc/:/host/proc/:ro
+#     - /sys/fs/cgroup:/host/sys/fs/cgroup:ro
+#    logging:
+#      driver: none
