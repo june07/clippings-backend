@@ -66,10 +66,13 @@ jobs:
       - name: SSH Key Setup
         run: |
           mkdir -p ~/.ssh
-          echo "{{ env.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo "{{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H k8s-deployment.june07.com >> ~/.ssh/known_hosts
 
       - name: Deploy to Production
         run: |
-          ssh will@k8s-deployment.june07.com ~/${{ env.GITHUB_REPOSITORY }}/update-service.sh ghcr.io/${{ env.GITHUB_REPOSITORY }}:api-${{ env.GITHUB_SHA }} jc-backend_node
+          ssh will@k8s-deployment.june07.com ~/${GITHUB_REPOSITORY}/update-service.sh ghcr.io/${GITHUB_REPOSITORY}:api-${GITHUB_SHA} jc-backend_node
+        env:
+          GITHUB_REPOSITORY: ${{ env.GITHUB_REPOSITORY }}
+          GITHUB_SHA: ${{ env.GITHUB_SHA }}
