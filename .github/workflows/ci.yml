@@ -72,9 +72,5 @@ jobs:
 
       - name: Deploy to Production
         run: |
-          echo $GITHUB_REPOSITORY
-          echo $GITHUB_SHA
-          echo ${{GITHUB_REPOSITORY}}
-          echo ${{GITHUB_SHA}}
           ssh -v will@k8s-deployment.june07.com "~/$GITHUB_REPOSITORY/update-service.sh ghcr.io/$GITHUB_REPOSITORY:api-$GITHUB_SHA jc-backend_node"
 
