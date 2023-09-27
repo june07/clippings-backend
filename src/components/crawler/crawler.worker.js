@@ -5,7 +5,7 @@ const { PlaywrightCrawler, Configuration } = require('crawlee')
 const { BrowserName, DeviceCategory, OperatingSystemsName } = require('@crawlee/browser-pool')
 
 const { parserService } = require('../parser')
-const { config, logger } = require('../../config')
+const { config, logger, redis } = require('../../config')
 
 const crawleeConfig = Configuration.getGlobalConfig()
 crawleeConfig.set('logLevel', config.NODE_ENV === 'production' ? 'INFO' : 'DEBUG')
