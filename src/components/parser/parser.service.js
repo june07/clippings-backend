@@ -3,7 +3,7 @@ const cheerio = require('cheerio')
 
 const { estimateTimestampFromRelativeTime } = require('../../utils')
 
-const parse = async (payload) => {
+const parse = async (payload, redis) => {
     const { url, uuid, html } = payload
     const $ = cheerio.load(html)
     const $searchResults = $('li.cl-search-result')
