@@ -47,9 +47,9 @@ class CrawlerWorker extends EventEmitter {
             results[1].map(key => redis.HDEL(`queued-${hostname()}`, key))
 
             if (!crawlers[sessionId]) {
-                crawlers[sessionId] = await launchCrawler(urls, emitter, sessionId)
+                crawlers[sessionId] = await launchCrawler(urls, emitter, sessionId, redis)
             } else if (!numberOfCrawlers || numberOfCrawlers < userConfig?.crawlerLimit || 1) {
-                crawlers[sessionId] = await launchCrawler(urls, emitter, sessionId)
+                crawlers[sessionId] = await launchCrawler(urls, emitter, sessionId, redis)
             }
 
             run(crawlers[sessionId], urls)
@@ -62,7 +62,7 @@ class CrawlerWorker extends EventEmitter {
 
 module.exports = CrawlerWorker
 
-async function launchCrawler(urlMap, emitter, sessionId) {
+async function launchCrawler(urlMap, emitter, sessionId, redis) {
     const crawler = new PlaywrightCrawler({
         launchContext: {
             useIncognitoPages: true,
