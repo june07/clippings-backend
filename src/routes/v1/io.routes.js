@@ -1,3 +1,4 @@
+const debug = require('debug')(`jc-backend:routes:v1:io.routes`)
 const { hostname } = require('os')
 const { until } = require('async')
 const { customAlphabet } = require('nanoid')

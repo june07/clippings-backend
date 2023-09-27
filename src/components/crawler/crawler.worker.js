@@ -1,4 +1,4 @@
-const debug = require('debug')(`crawler:worker`)
+const debug = require('debug')(`jc-backend:crawler:worker`)
 const { hostname } = require('os')
 const { EventEmitter } = require('events')
 const { PlaywrightCrawler, Configuration } = require('crawlee')
@@ -16,7 +16,7 @@ class CrawlerWorker extends EventEmitter {
         this.redis = redis
         this.emitter = new EventEmitter()
         this.emitter.on('parse', async payload => {
-            const { json, diff } = await parserService.parse(payload)
+            const { json, diff } = await parserService.parse(payload, redis)
 
 
             if (diff?.listings && Object.keys(diff.listings).length) {

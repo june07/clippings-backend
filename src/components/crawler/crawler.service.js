@@ -1,4 +1,4 @@
-const debug = require('debug')(`crawler:service`)
+const debug = require('debug')(`jc-backend:crawler:service`)
 
 const redis = require('../../config/redis')
 const CrawlerWorker = require('./crawler.worker')

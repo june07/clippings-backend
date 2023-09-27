@@ -1,4 +1,4 @@
-const debug = require('debug')(`jc:parser:service`)
+const debug = require('debug')(`jc-backend:parser:service`)
 const cheerio = require('cheerio')
 
 const { estimateTimestampFromRelativeTime } = require('../../utils')
