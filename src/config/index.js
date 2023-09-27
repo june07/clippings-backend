@@ -1,5 +1,6 @@
 module.exports = {
     config: require('./config'),
     logger: require('./logger'),
-    morgan: require('./morgan')
+    morgan: require('./morgan'),
+    redis: require('./redis')
 }
