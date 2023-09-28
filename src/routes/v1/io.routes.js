@@ -1,10 +1,8 @@
 const debug = require('debug')(`jc-backend:routes:v1:io.routes`)
-const { hostname } = require('os')
 const { until } = require('async')
 const { customAlphabet } = require('nanoid')
 const shortCode = customAlphabet('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 3)
 const { v5: uuidv5 } = require('uuid')
-const cookie = require('cookie')
 
 const logger = require('../../config/logger')
 const { crawlerService } = require('../../components/crawler')
@@ -17,17 +15,15 @@ let local = {
 function router(io) {
     console.log('Setting up io routes...')
     io.of('/').on('connection', socket => {
-        const cookies = cookie.parse(socket.handshake.headers.cookie)
-        const sessionId = cookies['connect.sid']?.match(/s:([^\.]*)/)[1] || 'nosession'
-
-        socket.send('connected to / endpoint')
+        const clientId = socket.request.headers['x-client-id']
+        
         socket.on('get', async (url, callback) => {
             const uuid = uuidv5(url, uuidv5.URL)
             const { nocache } = socket.handshake.query
             const updateEmitterName = `update-${uuid}`
-            const redisSessionsPerUUIDKey = `sessions-${hostname()}-${uuid}`
+            const redisSessionsPerUUIDKey = `sessions-${uuid}`
 
-            socket.craigslist = { url, uuid, nocache, sessionId }
+            socket.craigslist = { url, uuid, nocache, clientId }
 
             const { json, isCached, emitter } = await crawlerService.get(socket.craigslist)
             if (json) {
@@ -44,15 +40,15 @@ function router(io) {
                 })
             }
             if (!await redis.SMEMBERS(redisSessionsPerUUIDKey).length) {
-                redis.SADD(redisSessionsPerUUIDKey, sessionId)
-                const cachedIntervalId = await redis.HGET(`intervalIds-${hostname()}`, uuid)
+                redis.SADD(redisSessionsPerUUIDKey, clientId)
+                const cachedIntervalId = await redis.HGET(`intervalIds`, uuid)
                 if (!cachedIntervalId) {
                     if (local.intervals[cachedIntervalId]) {
                         clearInterval(cachedIntervalId)
                         logger.log(`cleared local interval that didn't exist in redis!`)
                     }
                     const interval = setInterval(() => {
-                        console.log(`${new Date().toLocaleTimeString()}: running interval for redisSessionsPerUUIDKey: ${redisSessionsPerUUIDKey}, sessionId: ${sessionId}`)
+                        console.log(`${new Date().toLocaleTimeString()}: running interval for redisSessionsPerUUIDKey: ${redisSessionsPerUUIDKey}, clientId: ${clientId}`)
                         crawlerService.get({
                             ...socket.craigslist,
                             nocache: true
@@ -60,7 +56,7 @@ function router(io) {
                     }, 60000)
                     const intervalId = interval[Symbol.toPrimitive]()
                     local.intervals[intervalId] = new Date().toLocaleString()
-                    redis.HSET(`intervalIds-${hostname()}`, uuid, intervalId)
+                    redis.HSET(`intervalIds`, uuid, intervalId)
                 }
             }
         }).on('sync', (remoteState) => {
@@ -136,18 +132,18 @@ function router(io) {
         })
             .on('disconnect', async (_reason) => {
                 if (!socket?.craigslist?.uuid) return
-                const { uuid, sessionId } = socket.craigslist
-                const redisSessionsPerUUIDKey = `sessions-${hostname()}-${uuid}`
+                const { uuid, clientId } = socket.craigslist
+                const redisSessionsPerUUIDKey = `sessions-${uuid}`
 
-                await redis.SREM(redisSessionsPerUUIDKey, sessionId)
+                await redis.SREM(redisSessionsPerUUIDKey, clientId)
                 const members = await redis.SMEMBERS(redisSessionsPerUUIDKey)
                 /** some other factors should be considered before removing the search since alerts can still be received when offline */
                 if (!members.length) {
-                    const intervalId = await redis.HGET(`intervalIds-${hostname()}`, uuid)
+                    const intervalId = await redis.HGET(`intervalIds`, uuid)
                     if (local.intervals[intervalId]) {
                         clearInterval(intervalId)
                         delete local.intervals[intervalId]
-                        redis.HDEL(`intervalIds-${hostname()}`, uuid)
+                        redis.HDEL(`intervalIds`, uuid)
                     }
                 }
             })
@@ -157,9 +153,9 @@ function router(io) {
 module.exports = router
 
 process.on('SIGUSR2', async () => {
-    const socketsKeys = await redis.KEYS(`sessions-${hostname()}-*`)
+    const socketsKeys = await redis.KEYS(`sessions-*`)
     await Promise.all([
-        redis.DEL(`intervalIds-${hostname()}`),
+        redis.DEL(`intervalIds`),
         ...socketsKeys.map(key => redis.DEL(key, 0, -1))
     ])
 })

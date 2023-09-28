@@ -4,7 +4,7 @@ services:
   node-app:
     build: .
     image: node-app
-    env_file: .env
+    env_file: .env.local
     environment:
       - DD_AGENT_HOST=datadog      
     volumes:

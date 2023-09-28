@@ -1,5 +1,4 @@
 const debug = require('debug')(`jc-backend:crawler:worker`)
-const { hostname } = require('os')
 const { EventEmitter } = require('events')
 const { PlaywrightCrawler, Configuration } = require('crawlee')
 const { BrowserName, DeviceCategory, OperatingSystemsName } = require('@crawlee/browser-pool')
@@ -29,40 +28,40 @@ class CrawlerWorker extends EventEmitter {
     }
     async crawl(options) {
         const { redis, emitter, crawlers } = this
-        const { url, uuid, sessionId } = options
-        const isRunning = await redis.GET(`running-${hostname()}-${uuid}`)
+        const { url, uuid, clientId } = options
+        const isRunning = await redis.GET(`running-${uuid}`)
 
         if (!isRunning) {
             // check to see if the user is at the maximum crawler limit first and wait for the next cycle, otherwise start a new crawl
-            const userConfig = JSON.parse(await redis.HGET('userConfig', sessionId))
-            const numberOfCrawlers = await redis.ZSCORE(`crawlers-${hostname()}`, sessionId)
+            const userConfig = JSON.parse(await redis.HGET('userConfig', clientId))
+            const numberOfCrawlers = await redis.ZSCORE(`crawlers`, clientId)
 
-            await redis.SET(`running-${hostname()}-${uuid}`, new Date().toLocaleString(), { EX: 120 })
+            await redis.SET(`running-${uuid}`, new Date().toLocaleString(), { EX: 120 })
             
             const multi = redis.multi()
-            multi.HVALS(`queued-${hostname()}`, sessionId)
-            multi.HKEYS(`queued-${hostname()}`, sessionId)
+            multi.HVALS(`queued`, clientId)
+            multi.HKEYS(`queued`, clientId)
             const results = await multi.exec()
             const urls = results[0]
-            results[1].map(key => redis.HDEL(`queued-${hostname()}`, key))
+            results[1].map(key => redis.HDEL(`queued`, key))
 
-            if (!crawlers[sessionId]) {
-                crawlers[sessionId] = await launchCrawler(urls, emitter, sessionId, redis)
+            if (!crawlers[clientId]) {
+                crawlers[clientId] = await launchCrawler(urls, emitter, clientId, redis)
             } else if (!numberOfCrawlers || numberOfCrawlers < userConfig?.crawlerLimit || 1) {
-                crawlers[sessionId] = await launchCrawler(urls, emitter, sessionId, redis)
+                crawlers[clientId] = await launchCrawler(urls, emitter, clientId, redis)
             }
 
-            run(crawlers[sessionId], urls)
+            run(crawlers[clientId], urls)
         } else {
-            console.log(`${new Date().toLocaleTimeString()}: queued sessionId: ${sessionId}`)
-            redis.HSET(`queued-${hostname()}`, sessionId, `${uuid} ${url}`)
+            console.log(`${new Date().toLocaleTimeString()}: queued clientId: ${clientId}`)
+            redis.HSET(`queued`, clientId, `${uuid} ${url}`)
         }
     }
 }
 
 module.exports = CrawlerWorker
 
-async function launchCrawler(urlMap, emitter, sessionId, redis) {
+async function launchCrawler(urlMap, emitter, clientId, redis) {
     const crawler = new PlaywrightCrawler({
         launchContext: {
             useIncognitoPages: true,
@@ -124,7 +123,7 @@ async function launchCrawler(urlMap, emitter, sessionId, redis) {
             await page.close()
         }
     })
-    redis.ZINCRBY(`crawlers-${hostname()}`, 1, sessionId)
+    redis.ZINCRBY(`crawlers`, 1, clientId)
     return crawler
 }
 async function run(crawler, urlMap) {
@@ -138,15 +137,15 @@ async function run(crawler, urlMap) {
         config.NODE_ENV === 'production' ? logger.error(error) : debug(error)
     } finally {
         const multi = redis.multi()
-        uuids.forEach(uuid => multi.DEL(`running-${(hostname())}-${uuid}`))
+        uuids.forEach(uuid => multi.DEL(`running-${uuid}`))
         multi.exec()
     }
 }
 process.on('SIGUSR2', async () => {
-    const queuedKeys = await redis.KEYS(`queued-${hostname()}-*`)
-    const runningKeys = await redis.KEYS(`running-${hostname()}-*`)
+    const queuedKeys = await redis.KEYS(`queued-*`)
+    const runningKeys = await redis.KEYS(`running-*`)
     await Promise.all([
-        redis.ZREMRANGEBYRANK(`crawlers-${hostname()}`, 0, -1),
+        redis.ZREMRANGEBYRANK(`crawlers`, 0, -1),
         ...queuedKeys.map(key => redis.DEL(key, 0, -1)),
         ...runningKeys.map(key => redis.DEL(key, 0, -1))
     ])

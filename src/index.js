@@ -2,13 +2,12 @@ require('dd-trace').init()
 const inspector = require('node:inspector')
 const { Server } = require('socket.io')
 const https = require('https')
+const fs = require('fs')
+
 const app = require('./app')
 const logger = require('./config/logger')
 const config = require('./config/config')
-const httpStatus = require('http-status')
 const ioRouter = require('./routes/v1/io.routes')
-const fs = require('fs')
-const { ApiError } = require('./utils')
 
 const server = https.createServer({
     key: fs.readFileSync('./cert.pem', 'utf8'),
@@ -18,31 +17,40 @@ server.listen(config.PORT, () => {
     console.log(`listening on ${config.PORT}`)
 })
 const io = new Server(server, {
-    path: '/ws',
     cors: {
         credentials: true,
-        origin: config.CORS_DOMAINS.split(' ').map(
-            (domain) => `https://${config.NODE_ENV === 'production' ? '' : 'dev.'}${domain}`
-        ),
+        origin: config.CORS_DOMAINS.split(' ')
     },
     maxPayload: 10e6,
-    maxHttpBufferSize: 10e6
+    maxHttpBufferSize: 10e6,
+    cookie: {
+        name: "io",
+        path: "/",
+        httpOnly: true,
+        sameSite: "strict",
+        secure: true
+    }
 })
-io.engine.use(app.sessionMW)
-io.on('connection', () => {
+io.use((socket, next) => {
+    const sessionId = socket.handshake.auth.sessionId
+    if (sessionId) {
+        // find existing session
+        app.sessionStore.get(sessionId, (error, session) => {
+            if (session) {
+                socket.sessionId = sessionId
+                next()
+            } else {
+                next('no sesssion')
+            }
+        })
+    } else {
+        next('no session')
+    }
+})
+io.on('connection', (socket) => {
     logger.info(`Socket.io connection is established`)
 })
 ioRouter(io)
-
-app.use((req, _res, next) => {
-    req.io = io
-    next()
-})
-
-// send back a 404 error for any unknown api request
-app.use((req, res, next) => {
-    next(new ApiError(httpStatus.NOT_FOUND, 'Not found'))
-})
 
 const exitHandler = () => {
     if (server) {

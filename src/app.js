@@ -77,12 +77,8 @@ app.use(
     })
 )
 app.options('*', cors())
-
-// limit repeated failed requests to auth endpoints
-if (config.NODE_ENV === 'production') {
-    app.use('/v1/auth', authLimiter)
-}
-const mw = session({
+app.head('/health', (_req, res) => res.send('ok'))
+app.use(session({
     secret: config.EXPRESS_SESSION_SECRET,
     store: sessionStore,
     saveUninitialized: true,
@@ -91,9 +87,15 @@ const mw = session({
         sameSite: 'none',
         httpOnly: false,
         secure: true,
+        domain: '.jc.june07.com',
     }
-})
-app.sessionMW = mw
+}))
+app.sessionStore = sessionStore
+// limit repeated failed requests to auth endpoints
+if (config.NODE_ENV === 'production') {
+    app.use('/v1/auth', authLimiter)
+}
+app.use('/v1/info', (_req, res) => res.send('v1'))
 app.use((req, _res, next) => {
     req.redis = redis
     next()
