@@ -87,7 +87,7 @@ app.use(session({
         sameSite: 'none',
         httpOnly: false,
         secure: true,
-        domain: '.jc.june07.com',
+        domain: config.COOKIE_DOMAIN,
     }
 }))
 app.sessionStore = sessionStore
