@@ -18,7 +18,7 @@ function router(io) {
     console.log('Setting up io routes...')
     io.of('/').on('connection', socket => {
         const cookies = cookie.parse(socket.handshake.headers.cookie)
-        const sessionId = cookies['connect.sid'].match(/s:([^\.]*)/)[1]
+        const sessionId = cookies['connect.sid']?.match(/s:([^\.]*)/)[1] || 'nosession'
 
         socket.send('connected to / endpoint')
         socket.on('get', async (url, callback) => {
