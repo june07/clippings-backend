@@ -45,16 +45,23 @@ function router(io) {
             }
             if (!await redis.SMEMBERS(redisSessionsPerUUIDKey).length) {
                 redis.SADD(redisSessionsPerUUIDKey, sessionId)
-                const interval = setInterval(() => {
-                    console.log(`${new Date().toLocaleTimeString()}: running interval for redisSessionsPerUUIDKey: ${redisSessionsPerUUIDKey}, sessionId: ${sessionId}`)
-                    crawlerService.get({
-                        ...socket.craigslist,
-                        nocache: true
-                    })
-                }, 60000)
-                const intervalId = interval[Symbol.toPrimitive]()
-                local.intervals[intervalId] = new Date().toLocaleString()
-                redis.HSET(`intervalIds-${hostname()}`, uuid, intervalId)
+                const cachedIntervalId = await redis.HGET(`intervalIds-${hostname()}`, uuid)
+                if (!cachedIntervalId) {
+                    if (local.intervals[cachedIntervalId]) {
+                        clearInterval(cachedIntervalId)
+                        logger.log(`cleared local interval that didn't exist in redis!`)
+                    }
+                    const interval = setInterval(() => {
+                        console.log(`${new Date().toLocaleTimeString()}: running interval for redisSessionsPerUUIDKey: ${redisSessionsPerUUIDKey}, sessionId: ${sessionId}`)
+                        crawlerService.get({
+                            ...socket.craigslist,
+                            nocache: true
+                        })
+                    }, 60000)
+                    const intervalId = interval[Symbol.toPrimitive]()
+                    local.intervals[intervalId] = new Date().toLocaleString()
+                    redis.HSET(`intervalIds-${hostname()}`, uuid, intervalId)
+                }
             }
         }).on('sync', (remoteState) => {
             if (remoteState) {
