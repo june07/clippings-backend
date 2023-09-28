@@ -69,7 +69,9 @@ async function launchCrawler(urlMap, emitter, sessionId, redis) {
             launchOptions: {
                 args: [
                     '--no-zygote',
-                    '--single-process'
+                    '--single-process',
+                    '--remote-debugging-port=9222',
+                    '--headless=new'
                 ]
             }
         },
