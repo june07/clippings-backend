@@ -15,8 +15,8 @@ let local = {
 function router(io) {
     console.log('Setting up io routes...')
     io.of('/').on('connection', socket => {
-        const clientId = socket.request.headers['x-client-id']
-        
+        const clientId = `${socket.request.headers['cf-connecting-ip']}_${socket.sessionId}`
+
         socket.on('get', async (url, callback) => {
             const uuid = uuidv5(url, uuidv5.URL)
             const { nocache } = socket.handshake.query
