@@ -39,7 +39,7 @@ function router(io) {
                     }
                 })
             }
-            if (!await redis.SMEMBERS(redisSessionsPerUUIDKey).length) {
+            if (!(await redis.SMEMBERS(redisSessionsPerUUIDKey)).length) {
                 redis.SADD(redisSessionsPerUUIDKey, clientId)
                 const cachedIntervalId = await redis.HGET(`intervalIds`, uuid)
                 if (!cachedIntervalId) {
@@ -56,7 +56,7 @@ function router(io) {
                     }, 60000)
                     const intervalId = interval[Symbol.toPrimitive]()
                     local.intervals[intervalId] = new Date().toLocaleString()
-                    redis.HSET(`intervalIds`, uuid, intervalId)
+                    await redis.HSET(`intervalIds`, uuid, intervalId)
                 }
             }
         }).on('sync', (remoteState) => {
