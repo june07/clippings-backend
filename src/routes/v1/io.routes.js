@@ -11,7 +11,21 @@ const redis = require('../../config/redis')
 let local = {
     intervals: {}
 }
-
+async function setInterval(socket, uuid) {
+    const interval = setInterval(() => {
+        console.log(`${new Date().toLocaleTimeString()}: running interval for redisSessionsPerUUIDKey: ${redisSessionsPerUUIDKey}, clientId: ${clientId}`)
+        crawlerService.get({
+            ...socket.craigslist,
+            nocache: true
+        })
+    }, 60000)
+    const intervalId = interval[Symbol.toPrimitive]()
+    local.intervals[intervalId] = Date.now()
+    await redis.HSET(`intervalIds`, uuid, {
+        id: intervalId,
+        timestamp: local.intervals[intervalId]
+    })
+}
 function router(io) {
     console.log('Setting up io routes...')
     io.of('/').on('connection', socket => {
@@ -41,26 +55,19 @@ function router(io) {
             }
             if (!(await redis.SMEMBERS(redisSessionsPerUUIDKey)).length) {
                 redis.SADD(redisSessionsPerUUIDKey, clientId)
-                const cachedIntervalId = await redis.HGET(`intervalIds`, uuid)
-                if (!cachedIntervalId) {
-                    if (local.intervals[cachedIntervalId]) {
-                        clearInterval(cachedIntervalId)
-                        logger.log(`cleared local interval that didn't exist in redis!`)
-                    }
+                let cachedInterval = await redis.HGET(`intervalIds`, uuid)
+                if (!cachedInterval) {
                     crawlerService.get({
                         ...socket.craigslist,
                         nocache: true
                     })
-                    const interval = setInterval(() => {
-                        console.log(`${new Date().toLocaleTimeString()}: running interval for redisSessionsPerUUIDKey: ${redisSessionsPerUUIDKey}, clientId: ${clientId}`)
-                        crawlerService.get({
-                            ...socket.craigslist,
-                            nocache: true
-                        })
-                    }, 60000)
-                    const intervalId = interval[Symbol.toPrimitive]()
-                    local.intervals[intervalId] = new Date().toLocaleString()
-                    await redis.HSET(`intervalIds`, uuid, intervalId)
+                    setInterval(socket, uuid)
+                } else {
+                    cachedInterval = JSON.parse(cachedInterval)
+                    if (cachedInterval.timestamp > Date.now() + 60000) {
+                        clearInterval(cachedInterval.id)
+                        setInterval(socket, uuid)
+                    }
                 }
             }
         }).on('sync', (remoteState) => {
