@@ -21,10 +21,10 @@ async function _setInterval(socket, uuid) {
     }, 60000)
     const intervalId = interval[Symbol.toPrimitive]()
     local.intervals[intervalId] = Date.now()
-    await redis.HSET(`intervalIds`, uuid, {
+    await redis.HSET(`intervalIds`, uuid, JSON.stringify({
         id: intervalId,
         timestamp: local.intervals[intervalId]
-    })
+    }))
 }
 function router(io) {
     console.log('Setting up io routes...')
