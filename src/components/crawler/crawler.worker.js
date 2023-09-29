@@ -47,7 +47,7 @@ class CrawlerWorker extends EventEmitter {
 
             if (!crawlers[clientId]) {
                 crawlers[clientId] = await launchCrawler(urls, emitter, clientId, redis)
-            } else if (!numberOfCrawlers || numberOfCrawlers < userConfig?.crawlerLimit || 1) {
+            } else if (!numberOfCrawlers || numberOfCrawlers < (userConfig?.crawlerLimit || 1)) {
                 crawlers[clientId] = await launchCrawler(urls, emitter, clientId, redis)
             }
 

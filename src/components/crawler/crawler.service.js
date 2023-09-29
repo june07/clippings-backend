@@ -18,7 +18,7 @@ const get = async (options) => {
 
     if (cached && !nocache) {
         cached = JSON.parse(cached)
-        if (await redis.GET(`cl-running-${uuid}`)) {
+        if (await redis.GET(`running-${uuid}`)) {
             debug('crawlee is running already, returning cached response', url)
         } else {
             debug('nocache is not set, returning cached response', url)
