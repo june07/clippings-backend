@@ -3,6 +3,14 @@ const cheerio = require('cheerio')
 
 const { estimateTimestampFromRelativeTime } = require('../../utils')
 
+const parseMetadata = async (html) => {
+    const $ = cheerio.load(html)
+    const title = $('title').text()
+    const metadata = {
+        title
+    }
+    return metadata
+}
 const parse = async (payload, redis) => {
     const { url, uuid, html } = payload
     const $ = cheerio.load(html)
@@ -71,5 +79,6 @@ const parse = async (payload, redis) => {
 }
 
 module.exports = {
-    parse
+    parse,
+    parseMetadata
 }

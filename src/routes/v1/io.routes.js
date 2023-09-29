@@ -6,6 +6,7 @@ const { v5: uuidv5 } = require('uuid')
 
 const logger = require('../../config/logger')
 const { crawlerService } = require('../../components/crawler')
+const { parserService } = require('../../components/parser')
 const redis = require('../../config/redis')
 
 let local = {
@@ -13,10 +14,10 @@ let local = {
 }
 async function _setInterval(socket, uuid) {
     const { clientId } = socket.craigslist
-    const redisSessionsPerUUIDKey = `sessions-${uuid}`
+    const redisClientsPerUUIDKey = `clients-${uuid}`
 
     const interval = setInterval(() => {
-        console.log(`${new Date().toLocaleTimeString()}: running interval for redisSessionsPerUUIDKey: ${redisSessionsPerUUIDKey}, clientId: ${clientId}`)
+        console.log(`${new Date().toLocaleTimeString()}: running interval for redisClientsPerUUIDKey: ${redisClientsPerUUIDKey}, clientId: ${clientId}`)
         crawlerService.get({
             ...socket.craigslist,
             nocache: true
@@ -29,16 +30,32 @@ async function _setInterval(socket, uuid) {
         timestamp: local.intervals[intervalId]
     }))
 }
+async function addNewSearch(url, uuid, clientId) {
+    const gotScraping = await import('got-scraping')
+    const redisClientsPerUUIDKey = `clients-${uuid}`
+    const { body } = await gotScraping.got(url)
+
+    const metadata = await parserService.parseMetadata(body)
+
+    const multi = redis.multi()
+    multi.SADD(redisClientsPerUUIDKey, clientId)
+    multi.HSET('searches', uuid, JSON.stringify({
+        url,
+        uuid,
+        metadata
+    }))
+    await multi.exec()
+}
 function router(io) {
     console.log('Setting up io routes...')
     io.of('/').on('connection', socket => {
-        const clientId = `${socket.request.headers['cf-connecting-ip']}_${socket.sessionId}`
+        const clientId = `${socket.request.headers['x-forward-for']}_${socket.sessionId}`
 
         socket.on('get', async (url, callback) => {
             const uuid = uuidv5(url, uuidv5.URL)
             const { nocache } = socket.handshake.query
             const updateEmitterName = `update-${uuid}`
-            const redisSessionsPerUUIDKey = `sessions-${uuid}`
+            const redisClientsPerUUIDKey = `clients-${uuid}`
 
             socket.craigslist = { url, uuid, nocache, clientId }
 
@@ -56,8 +73,8 @@ function router(io) {
                     }
                 })
             }
-            if (!(await redis.SMEMBERS(redisSessionsPerUUIDKey)).length) {
-                redis.SADD(redisSessionsPerUUIDKey, clientId)
+            if (!(await redis.SMEMBERS(redisClientsPerUUIDKey)).length) {
+                addNewSearch(url, uuid, clientId)
                 let cachedInterval = await redis.HGET(`intervalIds`, uuid)
                 if (!cachedInterval) {
                     crawlerService.get({
@@ -143,14 +160,17 @@ function router(io) {
             if (queue) {
                 socket.broadcast.emit('audioQueue', queue)
             }
+        }).on('searchesList', async callback => {
+            const searches = await redis.HGETALL('searches')
+            callback(searches ? Object.values(searches) : [])
         })
             .on('disconnect', async (_reason) => {
                 if (!socket?.craigslist?.uuid) return
                 const { uuid, clientId } = socket.craigslist
-                const redisSessionsPerUUIDKey = `sessions-${uuid}`
+                const redisClientsPerUUIDKey = `clients-${uuid}`
 
-                await redis.SREM(redisSessionsPerUUIDKey, clientId)
-                const members = await redis.SMEMBERS(redisSessionsPerUUIDKey)
+                await redis.SREM(redisClientsPerUUIDKey, clientId)
+                const members = await redis.SMEMBERS(redisClientsPerUUIDKey)
                 /** some other factors should be considered before removing the search since alerts can still be received when offline */
                 if (!members.length) {
                     const intervalId = await redis.HGET(`intervalIds`, uuid)
@@ -167,7 +187,7 @@ function router(io) {
 module.exports = router
 
 process.on('SIGUSR2', async () => {
-    const socketsKeys = await redis.KEYS(`sessions-*`)
+    const socketsKeys = await redis.KEYS(`clients-*`)
     await Promise.all([
         redis.DEL(`intervalIds`),
         ...socketsKeys.map(key => redis.DEL(key, 0, -1))
