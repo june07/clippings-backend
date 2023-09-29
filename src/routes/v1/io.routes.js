@@ -12,6 +12,9 @@ let local = {
     intervals: {}
 }
 async function _setInterval(socket, uuid) {
+    const { clientId } = socket.craigslist
+    const redisSessionsPerUUIDKey = `sessions-${uuid}`
+
     const interval = setInterval(() => {
         console.log(`${new Date().toLocaleTimeString()}: running interval for redisSessionsPerUUIDKey: ${redisSessionsPerUUIDKey}, clientId: ${clientId}`)
         crawlerService.get({
