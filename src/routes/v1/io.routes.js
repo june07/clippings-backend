@@ -67,7 +67,7 @@ function router(io) {
                     _setInterval(socket, uuid)
                 } else {
                     cachedInterval = JSON.parse(cachedInterval)
-                    if (cachedInterval.timestamp > Date.now() + 60000) {
+                    if (cachedInterval.timestamp < Date.now() + 60000) {
                         clearInterval(cachedInterval.id)
                         _setInterval(socket, uuid)
                     }
