@@ -11,7 +11,7 @@ const redis = require('../../config/redis')
 let local = {
     intervals: {}
 }
-async function setInterval(socket, uuid) {
+async function _setInterval(socket, uuid) {
     const interval = setInterval(() => {
         console.log(`${new Date().toLocaleTimeString()}: running interval for redisSessionsPerUUIDKey: ${redisSessionsPerUUIDKey}, clientId: ${clientId}`)
         crawlerService.get({
@@ -61,12 +61,12 @@ function router(io) {
                         ...socket.craigslist,
                         nocache: true
                     })
-                    setInterval(socket, uuid)
+                    _setInterval(socket, uuid)
                 } else {
                     cachedInterval = JSON.parse(cachedInterval)
                     if (cachedInterval.timestamp > Date.now() + 60000) {
                         clearInterval(cachedInterval.id)
-                        setInterval(socket, uuid)
+                        _setInterval(socket, uuid)
                     }
                 }
             }
