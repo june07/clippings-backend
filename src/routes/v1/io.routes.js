@@ -47,6 +47,10 @@ function router(io) {
                         clearInterval(cachedIntervalId)
                         logger.log(`cleared local interval that didn't exist in redis!`)
                     }
+                    crawlerService.get({
+                        ...socket.craigslist,
+                        nocache: true
+                    })
                     const interval = setInterval(() => {
                         console.log(`${new Date().toLocaleTimeString()}: running interval for redisSessionsPerUUIDKey: ${redisSessionsPerUUIDKey}, clientId: ${clientId}`)
                         crawlerService.get({
