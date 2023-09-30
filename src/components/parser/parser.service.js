@@ -1,7 +1,9 @@
 const debug = require('debug')(`jc-backend:parser:service`)
 const cheerio = require('cheerio')
+const { map } = require('async')
 
 const { estimateTimestampFromRelativeTime } = require('../../utils')
+const { githubService } = require('../github')
 
 const parseMetadata = async (html) => {
     const $ = cheerio.load(html)
@@ -53,6 +55,14 @@ const parse = async (payload, redis) => {
     if (diff) {
         cached = JSON.parse(cached)
         const newListings = Object.keys(json.listings).filter(key => !cached.listings[key]).reduce((listings, key) => ({ ...listings, [key]: json.listings[key] }), {})
+
+        // update the cached listings with comment data
+        cached.listings = await map(cached.listings, async listing => {
+            if (listing.comments || await redis.HGET('commented', listing.pid)) {
+                listing.comments = await githubService.getCommentData(listing.pid)
+            }
+            return listing
+        })
 
         console.log('newListings: ', newListings)
         if (JSON.stringify(newListings) !== '{}') {

@@ -5,6 +5,7 @@ const { BrowserName, DeviceCategory, OperatingSystemsName } = require('@crawlee/
 
 const { parserService } = require('../parser')
 const { config, logger, redis } = require('../../config')
+const { githubService } = require('../github')
 
 const crawleeConfig = Configuration.getGlobalConfig()
 crawleeConfig.set('logLevel', config.NODE_ENV === 'production' ? 'INFO' : 'DEBUG')
@@ -23,6 +24,14 @@ class CrawlerWorker extends EventEmitter {
             } else if (json) {
                 this.emitter.emit('update', { json })
             }
+        }).on('archived', async archive => {
+            const { url, uuid, html, imageUrls } = archive
+
+            // store data in git
+            const gitUrl = githubService.saveAdToPages({ url, uuid, html, imageUrls })
+            await redis.HSET('archives', uuid, JSON.stringify({
+                gitUrl
+            }))
         })
         this.crawlers = {}
     }
@@ -37,7 +46,7 @@ class CrawlerWorker extends EventEmitter {
             const numberOfCrawlers = await redis.ZSCORE(`crawlers`, clientId)
 
             await redis.SET(`running-${uuid}`, new Date().toLocaleString(), { EX: 120 })
-            
+
             const multi = redis.multi()
             multi.HVALS(`queued`, clientId)
             multi.HKEYS(`queued`, clientId)
@@ -57,11 +66,87 @@ class CrawlerWorker extends EventEmitter {
             redis.HSET(`queued`, clientId, `${uuid} ${url}`)
         }
     }
+    async archive(options) {
+        const { redis, emitter, crawlers } = this
+        const { url, uuid, clientId } = options
+
+        await launchCrawler([url], emitter, clientId, redis, 'archive')   
+    }
 }
 
 module.exports = CrawlerWorker
 
-async function launchCrawler(urlMap, emitter, clientId, redis) {
+function getRequestHandler(options) {
+    const { type, urlMap, emitter } = options
+    let handler
+
+    if (!type) {
+        handler = async ({ request, page, log }) => {
+            log.info(`Processing ${request.url}...`)
+            await Promise.all([
+                page.waitForLoadState('networkidle'),
+                page.waitForLoadState('domcontentloaded'),
+                page.waitForLoadState('load')
+            ])
+
+            const listItems = await page.$$('li[data-pid]')
+            for (const listItem of listItems) {
+                const swipe = await listItem.waitForSelector('.swipe', { timeout: 250, state: 'visible' }).catch(() => null)
+
+                if (swipe) {
+                    await swipe.hover()
+                    const forwardArrow = await listItem.waitForSelector('.slider-forward-arrow', { timeout: 250, state: 'visible' }).catch(() => null)
+
+                    if (forwardArrow) {
+                        await forwardArrow.click()
+                    }
+                }
+            }
+
+            const html = await page.content()
+            const uuid = urlMap.find(m => m.split(' ')[1] === request.url).split(' ')[0]
+            emitter.emit('parse', { url: request.url, uuid, html })
+            await page.screenshot({ path: `/tmp/screenshot-${uuid}.png` })
+            await page.close()
+        }
+    } else if (type === 'archive') {
+        handler = async ({ request, page, log }) => {
+            log.info(`Processing ${request.url}...`)
+            await Promise.all([
+                page.waitForLoadState('networkidle'),
+                page.waitForLoadState('domcontentloaded'),
+                page.waitForLoadState('load')
+            ])
+
+            const gallery = await page.$('.gallery .swipe')
+            await gallery.hover()
+            await gallery.click()
+            await page.waitForSelector('.gallery.big')
+
+            const imageUrls = await page.evaluate(() => {
+                const imageElements = document.querySelectorAll('.gallery.big .slide img')
+                const urls = []
+
+                // Loop through the image elements and extract the 'src' attribute
+                imageElements.forEach((img) => {
+                    const url = img.getAttribute('src')
+                    urls.push(url)
+                })
+
+                return urls
+            })
+
+            const html = await page.content()
+
+            console.log({ url: request.url, uuid, html, imageUrls })
+            emitter.emit('archived', { url: request.url, uuid, html, imageUrls })
+            await page.screenshot({ path: `/tmp/screenshot-${uuid}.png` })
+            await page.close()
+        }
+    }
+    return handler
+}
+async function launchCrawler(urlMap, emitter, clientId, redis, type) {
     const crawler = new PlaywrightCrawler({
         launchContext: {
             useIncognitoPages: true,
@@ -94,34 +179,7 @@ async function launchCrawler(urlMap, emitter, clientId, redis) {
         requestHandlerTimeoutSecs: 60,
         maxRequestRetries: 1,
         // Use the requestHandler to process each of the crawled pages.
-        async requestHandler({ request, page, log }) {
-            log.info(`Processing ${request.url}...`)
-            await Promise.all([
-                page.waitForLoadState('networkidle'),
-                page.waitForLoadState('domcontentloaded'),
-                page.waitForLoadState('load')
-            ])
-
-            const listItems = await page.$$('li[data-pid]')
-            for (const listItem of listItems) {
-                const swipe = await listItem.waitForSelector('.swipe', { timeout: 250, state: 'visible' }).catch(() => null)
-
-                if (swipe) {
-                    await swipe.hover()
-                    const forwardArrow = await listItem.waitForSelector('.slider-forward-arrow', { timeout: 250, state: 'visible' }).catch(() => null)
-
-                    if (forwardArrow) {
-                        await forwardArrow.click()
-                    }
-                }
-            }
-
-            const html = await page.content()
-            const uuid = urlMap.find(m => m.split(' ')[1] === request.url).split(' ')[0]
-            emitter.emit('parse', { url: request.url, uuid, html })
-            await page.screenshot({ path: `/tmp/screenshot-${uuid}.png` })
-            await page.close()
-        }
+        requestHandler: getRequestHandler({ type, urlMap, emitter })
     })
     redis.ZINCRBY(`crawlers`, 1, clientId)
     return crawler
@@ -133,7 +191,7 @@ async function run(crawler, urlMap) {
     try {
         await crawler.run(urls)
         crawler.requestQueue.drop()
-    } catch(error) {
+    } catch (error) {
         config.NODE_ENV === 'production' ? logger.error(error) : debug(error)
     } finally {
         const multi = redis.multi()

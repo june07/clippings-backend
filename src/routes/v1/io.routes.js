@@ -8,6 +8,7 @@ const logger = require('../../config/logger')
 const { crawlerService } = require('../../components/crawler')
 const { parserService } = require('../../components/parser')
 const redis = require('../../config/redis')
+const { githubService } = require('../../components/github')
 
 let local = {
     intervals: {}
@@ -163,6 +164,17 @@ function router(io) {
         }).on('searchesList', async callback => {
             const searches = await redis.HGETALL('searches')
             callback(searches ? Object.values(searches) : [])
+        }).on('archive', async (url) => {
+            const uuid = uuidv5(url, uuidv5.URL)
+
+            socket.craigslist = { url, uuid, clientId }
+
+            await crawlerService.archive(socket.craigslist)
+        }).on('updateDiscussion', async (giscusDiscussion) => {
+            const { id, totalCommentCount } = giscusDiscussion
+
+            const commentData = await githubService.getCommentData(id)
+            await redis.HSET('commented', commentData.title, totalCommentCount) // commentData.title === pid
         })
             .on('disconnect', async (_reason) => {
                 if (!socket?.craigslist?.uuid) return

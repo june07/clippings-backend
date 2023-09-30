@@ -28,7 +28,20 @@ const get = async (options) => {
     crawlerWorker.crawl(options)
     return { emitter: crawlerWorker.emitter }
 }
+const archive = async (options) => {
+    const { uuid } = options
+    let cached = await redis.HGET('archives', uuid)
+
+    if (cached) {
+        cached = JSON.parse(cached)
+        
+        return { archive: cached, isCached: true, emitter: crawlerWorker.emitter }
+    }
+    crawlerWorker.archive(options)
+    return { emitter: crawlerWorker.emitter }
+}
 
 module.exports = {
-    get
+    get,
+    archive
 }
