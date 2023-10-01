@@ -41,6 +41,7 @@ class CrawlerWorker extends EventEmitter {
         const isRunning = await redis.GET(`running-${uuid}`)
 
         if (!isRunning) {
+            debug('crawling', uuid)
             // check to see if the user is at the maximum crawler limit first and wait for the next cycle, otherwise start a new crawl
             const userConfig = JSON.parse(await redis.HGET('userConfig', clientId))
             const numberOfCrawlers = await redis.ZSCORE(`crawlers`, clientId)
@@ -62,7 +63,7 @@ class CrawlerWorker extends EventEmitter {
 
             run(crawlers[clientId], urls)
         } else {
-            console.log(`${new Date().toLocaleTimeString()}: queued clientId: ${clientId}`)
+            debug(`${new Date().toLocaleTimeString()}: queued clientId: ${clientId}`)
             redis.HSET(`queued`, clientId, `${uuid} ${url}`)
         }
     }
@@ -77,11 +78,12 @@ class CrawlerWorker extends EventEmitter {
 module.exports = CrawlerWorker
 
 function getRequestHandler(options) {
-    const { type, urlMap, emitter } = options
+    const { type } = options
     let handler
 
     if (!type) {
         handler = async ({ request, page, log }) => {
+            const { urlMap, emitter } = options
             log.info(`Processing ${request.url}...`)
             await Promise.all([
                 page.waitForLoadState('networkidle'),
@@ -104,13 +106,16 @@ function getRequestHandler(options) {
             }
 
             const html = await page.content()
-            const uuid = urlMap.find(m => m.split(' ')[1] === request.url).split(' ')[0]
-            emitter.emit('parse', { url: request.url, uuid, html })
-            await page.screenshot({ path: `/tmp/screenshot-${uuid}.png` })
+            const uuid = urlMap.find(m => m.split(' ')[1] === request.url)?.split(' ')[0]
+            if (uuid) {
+                emitter.emit('parse', { url: request.url, uuid, html })
+                await page.screenshot({ path: `/tmp/screenshot-${uuid}.png` })
+            }
             await page.close()
         }
     } else if (type === 'archive') {
         handler = async ({ request, page, log }) => {
+            const { urlMap, emitter } = options
             log.info(`Processing ${request.url}...`)
             await Promise.all([
                 page.waitForLoadState('networkidle'),
@@ -189,8 +194,12 @@ async function run(crawler, urlMap) {
     const uuids = urlMap.map(m => m.split(' ')[0])
 
     try {
-        await crawler.run(urls)
-        crawler.requestQueue.drop()
+        if (crawler.running) {
+            crawler.addRequests(urls)
+        } else {
+            await crawler.run(urls)
+            crawler.requestQueue.drop()
+        }
     } catch (error) {
         config.NODE_ENV === 'production' ? logger.error(error) : debug(error)
     } finally {

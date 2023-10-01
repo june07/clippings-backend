@@ -87,6 +87,10 @@ function router(io) {
                     cachedInterval = JSON.parse(cachedInterval)
                     if (cachedInterval.timestamp < Date.now() + 60000) {
                         clearInterval(cachedInterval.id)
+                        crawlerService.get({
+                            ...socket.craigslist,
+                            nocache: true
+                        })
                         _setInterval(socket, uuid)
                     }
                 }
@@ -174,7 +178,10 @@ function router(io) {
             const { id, totalCommentCount } = giscusDiscussion
 
             const commentData = await githubService.getCommentData(id)
-            await redis.HSET('commented', commentData.title, totalCommentCount) // commentData.title === pid
+            if (commentData?.title) {
+                socket.broadcast.emit('updatedDiscussion', commentData)
+                await redis.HSET('commented', commentData.title, totalCommentCount) // commentData.title === pid
+            }
         })
             .on('disconnect', async (_reason) => {
                 if (!socket?.craigslist?.uuid) return

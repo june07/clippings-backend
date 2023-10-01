@@ -25,6 +25,7 @@ const get = async (options) => {
         }
         return { json: cached, isCached: true, emitter: crawlerWorker.emitter }
     }
+    debug('attempting to crawl...', uuid)
     crawlerWorker.crawl(options)
     return { emitter: crawlerWorker.emitter }
 }

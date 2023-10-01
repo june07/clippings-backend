@@ -1,3 +1,5 @@
+const { logger } = require('../../config')
+
 const debug = require('debug')('jc-backend:github:service'),
     { Octokit } = require("@octokit/rest")
 
@@ -64,8 +66,8 @@ async function getCommentData(id) {
             search(type: DISCUSSION, last: 1, query: "repo:june07/jc-comments in:id:${id}") {
                 nodes {
                     ... on Discussion {
+                        title
                         comments {
-                            title
                             totalCount
                         }
                     }
@@ -73,7 +75,7 @@ async function getCommentData(id) {
             }
         }
     `
-    const { data } = await got({
+    const { error, data } = await got({
         method: 'POST',
         url: 'http://api.github.com/graphql',
         headers: {
@@ -81,7 +83,11 @@ async function getCommentData(id) {
         },
         body: JSON.stringify({ query })
     }).json()
-    return data.search.nodes[0].comments
+    if (error) {
+        logger.error(error)
+        return
+    }
+    return data?.search?.nodes?.[0]
 }
 
 module.exports = {

@@ -4,6 +4,7 @@ const { map } = require('async')
 
 const { estimateTimestampFromRelativeTime } = require('../../utils')
 const { githubService } = require('../github')
+const crawlerService = require('../crawler/crawler.service')
 
 const parseMetadata = async (html) => {
     const $ = cheerio.load(html)
@@ -56,15 +57,6 @@ const parse = async (payload, redis) => {
         cached = JSON.parse(cached)
         const newListings = Object.keys(json.listings).filter(key => !cached.listings[key]).reduce((listings, key) => ({ ...listings, [key]: json.listings[key] }), {})
 
-        // update the cached listings with comment data
-        cached.listings = await map(cached.listings, async listing => {
-            if (listing.comments || await redis.HGET('commented', listing.pid)) {
-                listing.comments = await githubService.getCommentData(listing.pid)
-            }
-            return listing
-        })
-
-        console.log('newListings: ', newListings)
         if (JSON.stringify(newListings) !== '{}') {
             const multi = redis.multi()
             const diff = {
@@ -79,13 +71,34 @@ const parse = async (payload, redis) => {
             }))
             multi.SET(`cl-json-diff-${uuid}`, JSON.stringify(diff))
             multi.exec()
-            return { json, diff }
         }
     } else {
         redis.SET(`cl-json-${uuid}`, JSON.stringify(json))
-        return { json }
     }
-    return {}
+    const multi = redis.multi()
+    multi.HGETALL('commented')
+    //multi.DEL('commented')
+    const updateComments = (await multi.exec())[0]
+    const updateCommentsArr = Object.keys(updateComments) || []
+    if (updateCommentsArr.length) {
+        // update the cached listings with comment data
+        const listingsArr = Object.values(json.listings).filter(listing => updateCommentsArr.find(key => key === listing.pid))
+        if (listingsArr.length) {
+            await map(listingsArr, async listing => {
+                if (listing.commentData || await redis.HGET('commented', listing.pid)) {
+                    // all listings that are commented on should automatically be archived
+                    if (listing.commentData?.comments?.totalCount === 1 && !listing.archived) {
+                        const { url, uuid } = listing
+
+                        crawlerService.archive({ url, uuid, clientId: 'system' })
+                    }
+                    json.listings[listing.pid].commentData = await githubService.getCommentData(listing.pid)
+                }
+            })
+        }
+        redis.SET(`cl-json-${uuid}`, JSON.stringify(json))
+    }
+    return Object.fromEntries(Object.entries({ json, diff }).filter(([_key, value]) => value !== undefined))
 }
 
 module.exports = {
