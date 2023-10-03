@@ -6,10 +6,7 @@ const CrawlerWorker = require('./crawler.worker')
 const crawlerWorker = new CrawlerWorker(redis)
 
 crawlerWorker.emitter.on('update', payload => {
-    payload
-    if (payload.diff?.uuid) {
-        crawlerWorker.emitter.emit(`update-${payload.diff.uuid}`, payload)
-    }
+    crawlerWorker.emitter.emit(`update-${payload?.diff?.uuid || payload?.json?.uuid}`, payload)
 })
 
 const get = async (options) => {

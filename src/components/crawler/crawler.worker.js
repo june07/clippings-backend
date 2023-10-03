@@ -2,6 +2,7 @@ const debug = require('debug')(`jc-backend:crawler:worker`)
 const { EventEmitter } = require('events')
 const { PlaywrightCrawler, Configuration } = require('crawlee')
 const { BrowserName, DeviceCategory, OperatingSystemsName } = require('@crawlee/browser-pool')
+const { v5: uuidv5 } = require('uuid')
 
 const { parserService } = require('../parser')
 const { config, logger, redis } = require('../../config')
@@ -18,7 +19,6 @@ class CrawlerWorker extends EventEmitter {
         this.emitter.on('parse', async payload => {
             const { json, diff } = await parserService.parse(payload, redis)
 
-
             if (diff?.listings && Object.keys(diff.listings).length) {
                 this.emitter.emit('update', { diff })
             } else if (json) {
@@ -28,7 +28,7 @@ class CrawlerWorker extends EventEmitter {
             const { url, uuid, html, imageUrls } = archive
 
             // store data in git
-            const gitUrl = githubService.saveAdToPages({ url, uuid, html, imageUrls })
+            const gitUrl = await githubService.saveAdToPages({ url, uuid, html, imageUrls })
             await redis.HSET('archives', uuid, JSON.stringify({
                 gitUrl
             }))
@@ -71,7 +71,13 @@ class CrawlerWorker extends EventEmitter {
         const { redis, emitter, crawlers } = this
         const { url, uuid, clientId } = options
 
-        await launchCrawler([url], emitter, clientId, redis, 'archive')   
+        const crawler = await launchCrawler([url], emitter, clientId, redis, 'archive')
+        if (crawler.running) {
+            crawler.addRequests([url])
+        } else {
+            await crawler.run([url])
+            crawler.requestQueue.drop()
+        }
     }
 }
 
@@ -107,6 +113,7 @@ function getRequestHandler(options) {
 
             const html = await page.content()
             const uuid = urlMap.find(m => m.split(' ')[1] === request.url)?.split(' ')[0]
+            log.info(`Got html ${html.length}..., uuid: ${uuid}`)
             if (uuid) {
                 emitter.emit('parse', { url: request.url, uuid, html })
                 await page.screenshot({ path: `/tmp/screenshot-${uuid}.png` })
@@ -115,14 +122,15 @@ function getRequestHandler(options) {
         }
     } else if (type === 'archive') {
         handler = async ({ request, page, log }) => {
-            const { urlMap, emitter } = options
-            log.info(`Processing ${request.url}...`)
+            const { emitter } = options
+            log.info(`Archiving ${request.url}...`)
             await Promise.all([
                 page.waitForLoadState('networkidle'),
                 page.waitForLoadState('domcontentloaded'),
                 page.waitForLoadState('load')
             ])
 
+            const html = await page.content()
             const gallery = await page.$('.gallery .swipe')
             await gallery.hover()
             await gallery.click()
@@ -141,9 +149,9 @@ function getRequestHandler(options) {
                 return urls
             })
 
-            const html = await page.content()
+            const uuid = uuidv5(request.url, uuidv5.URL)
 
-            console.log({ url: request.url, uuid, html, imageUrls })
+            debug({ url: request.url, uuid, html, imageUrls })
             emitter.emit('archived', { url: request.url, uuid, html, imageUrls })
             await page.screenshot({ path: `/tmp/screenshot-${uuid}.png` })
             await page.close()
@@ -152,6 +160,7 @@ function getRequestHandler(options) {
     return handler
 }
 async function launchCrawler(urlMap, emitter, clientId, redis, type) {
+    const requestHandler = getRequestHandler({ type, urlMap, emitter })
     const crawler = new PlaywrightCrawler({
         launchContext: {
             useIncognitoPages: true,
@@ -184,7 +193,7 @@ async function launchCrawler(urlMap, emitter, clientId, redis, type) {
         requestHandlerTimeoutSecs: 60,
         maxRequestRetries: 1,
         // Use the requestHandler to process each of the crawled pages.
-        requestHandler: getRequestHandler({ type, urlMap, emitter })
+        requestHandler
     })
     redis.ZINCRBY(`crawlers`, 1, clientId)
     return crawler
