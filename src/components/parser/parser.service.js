@@ -1,6 +1,7 @@
 const debug = require('debug')(`jc-backend:parser:service`)
 const cheerio = require('cheerio')
 const { map } = require('async')
+const { v5: uuidv5 } = require('uuid')
 
 const { estimateTimestampFromRelativeTime } = require('../../utils')
 const { githubService } = require('../github')
@@ -29,12 +30,13 @@ const parse = async (payload, redis) => {
     $searchResults.each((_index, element) => {
         const pid = $(element).attr('data-pid')
         const href = $(element).find('.posting-title').attr('href')
+        const listingUUID = uuidv5(href, uuidv5.URL)
         const title = $(element).find('.cl-app-anchor .label').text()
         const meta = $(element).find('.meta').text().split($(element).find('.separator').text())
 
         if (!pid || !title) return
-        if (!json.listings[pid]) {
-            json.listings[pid] = {
+        if (!json.listings[listingUUID]) {
+            json.listings[listingUUID] = {
                 pid,
                 imageUrls: []
             }
@@ -43,13 +45,13 @@ const parse = async (payload, redis) => {
         $(element).find('.gallery-inner img').each((_index, element) => {
             const imageUrl = $(element).attr('src')
             if (imageUrl) {
-                json.listings[pid].imageUrls = Array.from(new Set([...json.listings[pid].imageUrls, imageUrl]))
+                json.listings[listingUUID].imageUrls = Array.from(new Set([...json.listings[listingUUID].imageUrls, imageUrl]))
             }
         })
-        json.listings[pid].href = href
-        json.listings[pid].title = title
-        json.listings[pid].meta = meta
-        json.listings[pid].time = estimateTimestampFromRelativeTime(json.listings[pid].meta[0])
+        json.listings[listingUUID].href = href
+        json.listings[listingUUID].title = title
+        json.listings[listingUUID].meta = meta
+        json.listings[listingUUID].time = estimateTimestampFromRelativeTime(json.listings[listingUUID].meta[0])
     })
     json.updatedAt = Date.now()
 
@@ -77,25 +79,42 @@ const parse = async (payload, redis) => {
     }
     const multi = redis.multi()
     multi.HGETALL('commented')
+    multi.HKEYS('archives')
     //multi.DEL('commented')
     const updateComments = (await multi.exec())[0]
     const updateCommentsArr = Object.keys(updateComments) || []
+    const archivesUUIDsArr = (await multi.exec())[1]
+    const promises = []
     if (updateCommentsArr.length) {
         // update the cached listings with comment data
-        const listingsArr = Object.values(json.listings).filter(listing => updateCommentsArr.find(key => key === listing.pid))
+        const listingsArr = Object.values(json.listings).filter(listing => updateCommentsArr.find(key => key === listing.uuid))
         if (listingsArr.length) {
-            await map(listingsArr, async listing => {
-                if (listing.commentData || await redis.HGET('commented', listing.pid)) {
-                    // all listings that are commented on should automatically be archived
-                    if (listing.commentData?.comments?.totalCount === 1 && !listing.archived) {
-                        const { url, uuid } = listing
+            promises.push(
+                map(listingsArr, async listing => {
+                    if (listing.commentData || await redis.HGET('commented', listing.uuid)) {
+                        // all listings that are commented on should automatically be archived
+                        if (listing.commentData?.comments?.totalCount === 1 && !listing.archived) {
+                            const { url, uuid } = listing
 
-                        crawlerService.archive({ url, uuid, clientId: 'system' })
+                            crawlerService.archive({ url, uuid, clientId: 'system' })
+                        }
+                        json.listings[listing.uuid].commentData = await githubService.getCommentData(listing.uuid)
                     }
-                    json.listings[listing.pid].commentData = await githubService.getCommentData(listing.pid)
+                })
+            )
+        }
+    }
+    if (archivesUUIDsArr.length) {
+        promises.push(
+            map(archivesUUIDsArr, async archiveUUID => {
+                if (json.listings[archiveUUID]) {
+                    json.listings[archiveUUID].archived = true
                 }
             })
-        }
+        )
+    }
+    if (promises.length) {
+        await Promise.all(promises)
         redis.SET(`cl-json-${uuid}`, JSON.stringify(json))
     }
     return Object.fromEntries(Object.entries({ json, diff }).filter(([_key, value]) => value !== undefined))

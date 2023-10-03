@@ -65,6 +65,9 @@ function router(io) {
                 callback({ json, isCached })
             }
             if (!emitter._events[updateEmitterName]) {
+                emitter.on('update', payload => {
+                    socket.nsp.emit('update', payload)
+                })
                 emitter.on(updateEmitterName, payload => {
                     if ((payload.json?.uuid || payload.diff?.uuid) === uuid) {
                         if (payload.diff) delete payload.json

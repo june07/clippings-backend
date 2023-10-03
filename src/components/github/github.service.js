@@ -24,11 +24,11 @@ async function downloadImage(url) {
     }
 }
 async function saveAdToPages(options) {
-    const { uuid, html, imageUrls } = options
+    const { pid, html, imageUrls } = options
     const octokit = new Octokit({
         auth: GITHUB_TOKEN,
     })
-    const subdir = `${uuid}-${Date.now()}`
+    const subdir = `${pid}`
     let modifiedHtml
 
     await mapSeries(imageUrls, async url => {
