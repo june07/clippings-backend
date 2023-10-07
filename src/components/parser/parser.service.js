@@ -59,9 +59,10 @@ const parse = async (payload, redis) => {
         cached = JSON.parse(cached)
         const newListings = Object.keys(json.listings).filter(key => !cached.listings[key]).reduce((listings, key) => ({ ...listings, [key]: json.listings[key] }), {})
 
+        diff = {}
         if (JSON.stringify(newListings) !== '{}') {
             const multi = redis.multi()
-            const diff = {
+            diff = {
                 ...json,
                 updatedAt: Date.now(),
                 listings: newListings

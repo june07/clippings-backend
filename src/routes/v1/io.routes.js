@@ -1,4 +1,3 @@
-const debug = require('debug')(`jc-backend:routes:v1:io.routes`)
 const { until } = require('async')
 const { customAlphabet } = require('nanoid')
 const shortCode = customAlphabet('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 3)
@@ -9,6 +8,8 @@ const { crawlerService } = require('../../components/crawler')
 const { parserService } = require('../../components/parser')
 const redis = require('../../config/redis')
 const { githubService } = require('../../components/github')
+
+const { CRAWL_INTERVAL_MS } = process.env
 
 let local = {
     intervals: {}
@@ -23,7 +24,7 @@ async function _setInterval(socket, uuid) {
             ...socket.craigslist,
             nocache: true
         })
-    }, 60000)
+    }, CRAWL_INTERVAL_MS)
     const intervalId = interval[Symbol.toPrimitive]()
     local.intervals[intervalId] = Date.now()
     await redis.HSET(`intervalIds`, uuid, JSON.stringify({
@@ -60,20 +61,25 @@ function router(io) {
 
             socket.craigslist = { url, uuid, nocache, clientId }
 
-            const { json, isCached, emitter } = await crawlerService.get(socket.craigslist)
+            const { json, isCached, emitter: crawlerServiceEmitter } = await crawlerService.get(socket.craigslist)
             if (json) {
                 callback({ json, isCached })
             }
-            if (!emitter._events[updateEmitterName]) {
-                emitter.on('update', payload => {
+            if (!crawlerServiceEmitter._events[updateEmitterName]) {
+                crawlerServiceEmitter.on('update', payload => {
                     socket.nsp.emit('update', payload)
                 })
-                emitter.on(updateEmitterName, payload => {
+                crawlerServiceEmitter.on(updateEmitterName, payload => {
                     if ((payload.json?.uuid || payload.diff?.uuid) === uuid) {
                         if (payload.diff) delete payload.json
                         if (payload.diff?.listings && Object.keys(payload.diff.listings).length) {
                             socket.nsp.emit('update', payload)
                         }
+                    }
+                })
+                .on('screenshot', payload => {
+                    if (payload.uuid === uuid) {
+                        socket.nsp.emit('screenshot', payload)
                     }
                 })
             }
@@ -88,7 +94,7 @@ function router(io) {
                     _setInterval(socket, uuid)
                 } else {
                     cachedInterval = JSON.parse(cachedInterval)
-                    if (cachedInterval.timestamp < Date.now() + 60000) {
+                    if (cachedInterval.timestamp < Date.now() + CRAWL_INTERVAL_MS) {
                         clearInterval(cachedInterval.id)
                         crawlerService.get({
                             ...socket.craigslist,

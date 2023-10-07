@@ -1,4 +1,3 @@
-const debug = require('debug')(`jc-backend:crawler:worker`)
 const { EventEmitter } = require('events')
 const { PlaywrightCrawler, Configuration } = require('crawlee')
 const { BrowserName, DeviceCategory, OperatingSystemsName } = require('@crawlee/browser-pool')
@@ -8,6 +7,7 @@ const { parserService } = require('../parser')
 const { config, logger, redis } = require('../../config')
 const { githubService } = require('../github')
 
+const namespace = 'jc-backend:crawler:worker'
 const crawleeConfig = Configuration.getGlobalConfig()
 crawleeConfig.set('logLevel', config.NODE_ENV === 'production' ? 'INFO' : 'DEBUG')
 
@@ -21,8 +21,6 @@ class CrawlerWorker extends EventEmitter {
 
             if (diff?.listings && Object.keys(diff.listings).length) {
                 this.emitter.emit('update', { diff })
-            } else if (json) {
-                this.emitter.emit('update', { json })
             }
         }).on('archived', async archive => {
             const { url, uuid, html, imageUrls } = archive
@@ -33,7 +31,7 @@ class CrawlerWorker extends EventEmitter {
             await redis.HSET('archives', uuid, JSON.stringify({
                 gitUrl
             }))
-            this.emitter.emit('update', { archived: { pid, gitUrl }})
+            this.emitter.emit('update', { archived: { pid, gitUrl } })
         })
         this.crawlers = {}
     }
@@ -43,18 +41,18 @@ class CrawlerWorker extends EventEmitter {
         const isRunning = await redis.GET(`running-${uuid}`)
 
         if (!isRunning) {
-            debug('crawling', uuid)
+            logger.debug({ namespace, message: 'crawling', uuid })
             // check to see if the user is at the maximum crawler limit first and wait for the next cycle, otherwise start a new crawl
             const userConfig = JSON.parse(await redis.HGET('userConfig', clientId))
             const numberOfCrawlers = await redis.ZSCORE(`crawlers`, clientId)
 
-            await redis.SET(`running-${uuid}`, new Date().toLocaleString(), { EX: 120 })
+            await redis.SET(`running-${uuid}`, new Date().toLocaleString(), { EX: 30 })
 
             const multi = redis.multi()
             multi.HVALS(`queued`, clientId)
             multi.HKEYS(`queued`, clientId)
             const results = await multi.exec()
-            const urls = results[0]
+            const urls = Array.from(new Set([...results[0], `${uuid} ${url}`]))
             results[1].map(key => redis.HDEL(`queued`, key))
 
             if (!crawlers[clientId]) {
@@ -65,7 +63,7 @@ class CrawlerWorker extends EventEmitter {
 
             run(crawlers[clientId], urls)
         } else {
-            debug(`${new Date().toLocaleTimeString()}: queued clientId: ${clientId}`)
+            logger.debug({ namespace, message: `${new Date().toLocaleTimeString()}: queued clientId: ${clientId}` })
             redis.HSET(`queued`, clientId, `${uuid} ${url}`)
         }
     }
@@ -98,27 +96,33 @@ function getRequestHandler(options) {
                 page.waitForLoadState('domcontentloaded'),
                 page.waitForLoadState('load')
             ])
-
+            log.info(`Loaded ${request.url}...`)
             const listItems = await page.$$('li[data-pid]')
             for (const listItem of listItems) {
-                const swipe = await listItem.waitForSelector('.swipe', { timeout: 250, state: 'visible' }).catch(() => null)
+                const pid = await listItem.evaluate((element) => element.getAttribute('data-pid'))
 
-                if (swipe) {
-                    await swipe.hover()
-                    const forwardArrow = await listItem.waitForSelector('.slider-forward-arrow', { timeout: 250, state: 'visible' }).catch(() => null)
+                if (!await redis.HGET('pids', pid)) {
+                    redis.HSET('pids', pid, Date.now())
+                    const swipe = await listItem.waitForSelector('.swipe', { timeout: 250, state: 'visible' }).catch(() => null)
 
-                    if (forwardArrow) {
-                        await forwardArrow.click()
+                    if (swipe) {
+                        await swipe.hover()
+                        const forwardArrow = await listItem.waitForSelector('.slider-forward-arrow', { timeout: 250, state: 'visible' }).catch(() => null)
+
+                        if (forwardArrow) {
+                            await forwardArrow.click()
+                        }
                     }
                 }
             }
-
+            log.info(`Interacted ${request.url}...`)
             const html = await page.content()
             const uuid = urlMap.find(m => m.split(' ')[1] === request.url)?.split(' ')[0]
-            log.info(`Got html ${html.length}..., uuid: ${uuid}`)
+            log.info(`Got html ${html.length}..., uuid: ${uuid}, urlMap: ${urlMap}, page: ${request.url}`)
             if (uuid) {
-                emitter.emit('parse', { url: request.url, uuid, html })
-                await page.screenshot({ path: `/tmp/screenshot-${uuid}.png` })
+                emitter.emit('parse', { url: request.url, uuid, html });
+                const buffer = await page.screenshot()
+                emitter.emit('screenshot', { buffer, uuid })
             }
             await page.close()
         }
@@ -153,7 +157,7 @@ function getRequestHandler(options) {
 
             const uuid = uuidv5(request.url, uuidv5.URL)
 
-            debug({ url: request.url, uuid, html, imageUrls })
+            logger.debug({ namespace, message: { url: request.url, uuid, html, imageUrls } })
             emitter.emit('archived', { url: request.url, uuid, html, imageUrls })
             await page.screenshot({ path: `/tmp/screenshot-${uuid}.png` })
             await page.close()
@@ -163,47 +167,52 @@ function getRequestHandler(options) {
 }
 async function launchCrawler(urlMap, emitter, clientId, redis, type) {
     const requestHandler = getRequestHandler({ type, urlMap, emitter })
-    const crawler = new PlaywrightCrawler({
-        launchContext: {
-            useIncognitoPages: true,
-            launchOptions: {
-                args: [
-                    '--no-zygote',
-                    '--single-process',
-                    '--remote-debugging-port=9222',
-                    '--headless=new'
-                ]
-            }
-        },
-        browserPoolOptions: {
-            useFingerprints: true, // this is the default
-            fingerprintOptions: {
-                fingerprintGeneratorOptions: {
-                    browsers: [{
-                        name: BrowserName.edge,
-                        minVersion: 96,
-                    }],
-                    devices: [
-                        DeviceCategory.desktop,
-                    ],
-                    operatingSystems: [
-                        OperatingSystemsName.windows,
-                    ],
+    const crawlerWrapper = {
+        crawler: new PlaywrightCrawler({
+            launchContext: {
+                useIncognitoPages: true,
+                launchOptions: {
+                    args: [
+                        '--no-zygote',
+                        '--single-process',
+                        '--remote-debugging-port=9222',
+                        '--headless=new'
+                    ]
+                }
+            },
+            browserPoolOptions: {
+                useFingerprints: true, // this is the default
+                fingerprintOptions: {
+                    fingerprintGeneratorOptions: {
+                        browsers: [{
+                            name: BrowserName.edge,
+                            minVersion: 96,
+                        }],
+                        devices: [
+                            DeviceCategory.desktop,
+                        ],
+                        operatingSystems: [
+                            OperatingSystemsName.windows,
+                        ],
+                    },
                 },
             },
-        },
-        requestHandlerTimeoutSecs: 60,
-        maxRequestRetries: 1,
-        // Use the requestHandler to process each of the crawled pages.
-        requestHandler
-    })
+            requestHandlerTimeoutSecs: 60,
+            maxRequestRetries: 1,
+            // Use the requestHandler to process each of the crawled pages.
+            requestHandler
+        }),
+        options: { type, emitter }
+    }
     redis.ZINCRBY(`crawlers`, 1, clientId)
-    return crawler
+    return crawlerWrapper
 }
-async function run(crawler, urlMap) {
+async function run(crawlerWrapper, urlMap) {
     const urls = urlMap.map(m => m.split(' ')[1])
     const uuids = urlMap.map(m => m.split(' ')[0])
+    const { crawler, options: { type, emitter } } = crawlerWrapper
 
+    crawler.requestHandler = getRequestHandler({ type, urlMap, emitter })
     try {
         if (crawler.running) {
             crawler.addRequests(urls)
@@ -212,7 +221,7 @@ async function run(crawler, urlMap) {
             crawler.requestQueue.drop()
         }
     } catch (error) {
-        config.NODE_ENV === 'production' ? logger.error(error) : debug(error)
+        config.NODE_ENV === 'production' ? logger.error(error) : logger.debug({ namespace, message: error })
     } finally {
         const multi = redis.multi()
         uuids.forEach(uuid => multi.DEL(`running-${uuid}`))
