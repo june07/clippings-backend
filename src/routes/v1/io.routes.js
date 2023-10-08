@@ -53,13 +53,13 @@ function router(io) {
     io.of('/').on('connection', socket => {
         const clientId = `${socket.request.headers['x-forward-for']}_${socket.sessionId}`
 
-        socket.on('get', async (url, callback) => {
-            const uuid = uuidv5(url, uuidv5.URL)
+        socket.on('get', async (listingURL, callback) => {
+            const searchUUID = uuidv5(listingURL, uuidv5.URL)
             const { nocache } = socket.handshake.query
-            const updateEmitterName = `update-${uuid}`
-            const redisClientsPerUUIDKey = `clients-${uuid}`
+            const updateEmitterName = `update-${searchUUID}`
+            const redisClientsPerUUIDKey = `clients-${searchUUID}`
 
-            socket.craigslist = { url, uuid, nocache, clientId }
+            socket.craigslist = { listingURL, searchUUID, nocache, clientId }
 
             const { json, isCached, emitter: crawlerServiceEmitter } = await crawlerService.get(socket.craigslist)
             if (json) {
@@ -70,7 +70,7 @@ function router(io) {
                     socket.nsp.emit('update', payload)
                 })
                 crawlerServiceEmitter.on(updateEmitterName, payload => {
-                    if ((payload.json?.uuid || payload.diff?.uuid) === uuid) {
+                    if ((payload.json?.uuid || payload.diff?.uuid) === searchUUID) {
                         if (payload.diff) delete payload.json
                         if (payload.diff?.listings && Object.keys(payload.diff.listings).length) {
                             socket.nsp.emit('update', payload)
@@ -78,20 +78,20 @@ function router(io) {
                     }
                 })
                 .on('screenshot', payload => {
-                    if (payload.uuid === uuid) {
+                    if (payload.uuid === searchUUID) {
                         socket.nsp.emit('screenshot', payload)
                     }
                 })
             }
             if (!(await redis.SMEMBERS(redisClientsPerUUIDKey)).length) {
-                addNewSearch(url, uuid, clientId)
-                let cachedInterval = await redis.HGET(`intervalIds`, uuid)
+                addNewSearch(listingURL, searchUUID, clientId)
+                let cachedInterval = await redis.HGET(`intervalIds`, searchUUID)
                 if (!cachedInterval) {
                     crawlerService.get({
                         ...socket.craigslist,
                         nocache: true
                     })
-                    _setInterval(socket, uuid)
+                    _setInterval(socket, searchUUID)
                 } else {
                     cachedInterval = JSON.parse(cachedInterval)
                     if (cachedInterval.timestamp < Date.now() + CRAWL_INTERVAL_MS) {
@@ -100,7 +100,7 @@ function router(io) {
                             ...socket.craigslist,
                             nocache: true
                         })
-                        _setInterval(socket, uuid)
+                        _setInterval(socket, searchUUID)
                     }
                 }
             }
@@ -177,10 +177,10 @@ function router(io) {
         }).on('searchesList', async callback => {
             const searches = await redis.HGETALL('searches')
             callback(searches ? Object.values(searches) : [])
-        }).on('archive', async (url) => {
-            const uuid = uuidv5(url, uuidv5.URL)
+        }).on('archive', async (searchUUID, listingURL) => {
+            const listingUUID = uuidv5(listingURL, uuidv5.URL)
 
-            socket.craigslist = { url, uuid, clientId }
+            socket.craigslist = { searchUUID, listingURL, listingUUID, clientId }
 
             await crawlerService.archive(socket.craigslist)
         }).on('updateDiscussion', async (giscusDiscussion) => {

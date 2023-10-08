@@ -23,59 +23,89 @@ class CrawlerWorker extends EventEmitter {
                 this.emitter.emit('update', { diff })
             }
         }).on('archived', async archive => {
-            const { url, uuid, html, imageUrls } = archive
+            const { url, uuid, html, imageUrls, searchUUID } = archive
 
             // store data in git
             const pid = url.match(/\/([^\/]*)\.html/)[1]
-            const gitUrl = await githubService.saveAdToPages({ pid, html, imageUrls })
+            const gitUrl = await githubService.saveAdToPages({ url, html, imageUrls })
             await redis.HSET('archives', uuid, JSON.stringify({
                 gitUrl
             }))
+            if (searchUUID) {
+                // searchUUID can be undefined when archive is initiated by a user vs the system
+
+                const json = JSON.parse(await redis.GET(`cl-json-${searchUUID}`))
+                const diff = JSON.parse(await redis.GET(`cl-json-${searchUUID}`))
+                const multi = redis.multi()
+                multi.SET(`cl-json-${searchUUID}`, JSON.stringify({
+                    ...json,
+                    listings: {
+                        [uuid]: {
+                            ...json.listings[uuid],
+                            gitUrl
+                        },
+                        ...json.listings
+                    }
+                }))
+                multi.set(`cl-json-diff-${searchUUID}`, JSON.stringify({
+                    ...diff,
+                    listings: {
+                        [uuid]: {
+                            ...diff.listings[uuid],
+                            gitUrl
+                        },
+                        ...diff.listings
+                    }
+                }))
+                await multi.exec()
+            }
             this.emitter.emit('update', { archived: { pid, gitUrl } })
         })
         this.crawlers = {}
     }
     async crawl(options) {
         const { redis, emitter, crawlers } = this
-        const { url, uuid, clientId } = options
-        const isRunning = await redis.GET(`running-${uuid}`)
+        const { listingURL, searchUUID, clientId } = options
+        const isRunning = await redis.GET(`running-${searchUUID}`)
 
         if (!isRunning) {
-            logger.debug({ namespace, message: 'crawling', uuid })
+            logger.debug({ namespace, message: 'crawling', searchUUID })
             // check to see if the user is at the maximum crawler limit first and wait for the next cycle, otherwise start a new crawl
             const userConfig = JSON.parse(await redis.HGET('userConfig', clientId))
             const numberOfCrawlers = await redis.ZSCORE(`crawlers`, clientId)
 
-            await redis.SET(`running-${uuid}`, new Date().toLocaleString(), { EX: 30 })
+            await redis.SET(`running-${searchUUID}`, new Date().toLocaleString(), { EX: 30 })
 
             const multi = redis.multi()
             multi.HVALS(`queued`, clientId)
             multi.HKEYS(`queued`, clientId)
             const results = await multi.exec()
-            const urls = Array.from(new Set([...results[0], `${uuid} ${url}`]))
+            const urls = Array.from(new Set([...results[0], `${searchUUID} ${listingURL}`])).filter(url => url)
+
             results[1].map(key => redis.HDEL(`queued`, key))
 
             if (!crawlers[clientId]) {
-                crawlers[clientId] = await launchCrawler(urls, emitter, clientId, redis)
+                crawlers[clientId] = await launchCrawler(urls, emitter, options, redis)
             } else if (!numberOfCrawlers || numberOfCrawlers < (userConfig?.crawlerLimit || 1)) {
-                crawlers[clientId] = await launchCrawler(urls, emitter, clientId, redis)
+                crawlers[clientId] = await launchCrawler(urls, emitter, options, redis)
             }
 
             run(crawlers[clientId], urls)
         } else {
             logger.debug({ namespace, message: `${new Date().toLocaleTimeString()}: queued clientId: ${clientId}` })
-            redis.HSET(`queued`, clientId, `${uuid} ${url}`)
+            redis.HSET(`queued`, clientId, `${searchUUID} ${listingURL}`)
         }
     }
     async archive(options) {
-        const { redis, emitter, crawlers } = this
-        const { url, uuid, clientId } = options
+        const { redis, emitter } = this
+        const { listingURL } = options
 
-        const crawler = await launchCrawler([url], emitter, clientId, redis, 'archive')
+        const crawlerWrapper = await launchCrawler([listingURL], emitter, options, redis, 'archive')
+        const { crawler } = crawlerWrapper
         if (crawler.running) {
-            crawler.addRequests([url])
+            crawler.addRequests([listingURL])
         } else {
-            await crawler.run([url])
+            await crawler.run([listingURL])
             crawler.requestQueue.drop()
         }
     }
@@ -120,7 +150,7 @@ function getRequestHandler(options) {
             const uuid = urlMap.find(m => m.split(' ')[1] === request.url)?.split(' ')[0]
             log.info(`Got html ${html.length}..., uuid: ${uuid}, urlMap: ${urlMap}, page: ${request.url}`)
             if (uuid) {
-                emitter.emit('parse', { url: request.url, uuid, html });
+                emitter.emit('parse', { url: request.url, uuid, html })
                 const buffer = await page.screenshot()
                 emitter.emit('screenshot', { buffer, uuid })
             }
@@ -128,7 +158,7 @@ function getRequestHandler(options) {
         }
     } else if (type === 'archive') {
         handler = async ({ request, page, log }) => {
-            const { emitter } = options
+            const { emitter, searchUUID } = options
             log.info(`Archiving ${request.url}...`)
             await Promise.all([
                 page.waitForLoadState('networkidle'),
@@ -158,15 +188,16 @@ function getRequestHandler(options) {
             const uuid = uuidv5(request.url, uuidv5.URL)
 
             logger.debug({ namespace, message: { url: request.url, uuid, html, imageUrls } })
-            emitter.emit('archived', { url: request.url, uuid, html, imageUrls })
+            emitter.emit('archived', { url: request.url, uuid, html, imageUrls: Array.from(new Set(imageUrls)), searchUUID })
             await page.screenshot({ path: `/tmp/screenshot-${uuid}.png` })
             await page.close()
         }
     }
     return handler
 }
-async function launchCrawler(urlMap, emitter, clientId, redis, type) {
-    const requestHandler = getRequestHandler({ type, urlMap, emitter })
+async function launchCrawler(urlMap, emitter, options, redis, type) {
+    const { clientId } = options
+    const requestHandler = getRequestHandler({ type, urlMap, emitter, ...options })
     const crawlerWrapper = {
         crawler: new PlaywrightCrawler({
             launchContext: {

@@ -24,47 +24,105 @@ async function downloadImage(url) {
     }
 }
 async function saveAdToPages(options) {
-    const { pid, html, imageUrls } = options
+    const { url, html, imageUrls } = options
+    const pid = url.match(/\/([^\/]*)\.html/)[1]
     const octokit = new Octokit({
         auth: GITHUB_TOKEN,
     })
     const subdir = `${pid}`
-    let modifiedHtml
-
+    const indexHTMLHead = `
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Archived content listing of ${url}</title>
+        <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@2.7.1/css/lightgallery-bundle.min.css" />
+    </head>
+    <body>
+        <h2>Archived content listing of ${url}</h2>`
+    let indexHTMLListItems = '', indexHTMLLightGalleryItems = ''
+    const indexHTMLFoot = `
+        <script src="https://cdn.jsdelivr.net/npm/lightgallery@2.7.1/lightgallery.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/lightgallery@2/plugins/thumbnail/lg-thumbnail.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/lightgallery@2/plugins/zoom/lg-zoom.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/lightgallery@2/plugins/share/lg-share.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/lightgallery@2/plugins/rotate/lg-rotate.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/lightgallery@2/plugins/fullscreen/lg-fullscreen.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/lightgallery@2/plugins/mediumZoom/lg-medium-zoom.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/lightgallery@2/plugins/hash/lg-hash.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/lightgallery@2/plugins/comment/lg-comment.min.js"></script>
+        <script type="text/javascript">
+            lightGallery(document.getElementById('lightgallery'), {
+                plugins: [lgZoom, lgThumbnail, lgShare, lgRotate, lgFullscreen, lgMediumZoom, lgHash, lgComment],
+            })
+        </script>
+    </body>
+</html>`
+    try {
+        await octokit.repos.createOrUpdateFileContents({
+            owner: GITHUB_USER,
+            repo: GITHUB_REPO,
+            path: `craigslist/${subdir}/${pid}.html`,
+            message: `Craigslist ad archived via JC by June07`,
+            content: Buffer.from(html).toString('base64'),
+            committer: {
+                name: GITHUB_USER,
+                email: `support@${DOMAIN}`
+            }
+        })
+    } catch (error) {
+        error
+    }
     await mapSeries(imageUrls, async url => {
         const content = await downloadImage(url)
         const filenameBigImage = url.split('/').pop()
-        const baseFilename = filenameBigImage.match(/(.*)(_\d{3,4}x\d{3,4}.jpg)/)[1]
         const path = `craigslist/${subdir}/${filenameBigImage}`
 
-        modifiedHtml = (modifiedHtml || html).replaceAll(new RegExp(`href="https://images.craigslist.org/${baseFilename}.*.jpg"`, 'g'), `href="https://june07.github.io/jc-archive/craigslist/${subdir}/${filenameBigImage}"`)
+        indexHTMLListItems += `<li><a href="${filenameBigImage}">${filenameBigImage}</a></li>`
+        indexHTMLLightGalleryItems += `<a href="${filenameBigImage}"><img src="${filenameBigImage}" /></a>`
         if (content) {
-            await octokit.repos.createOrUpdateFileContents({
-                owner: GITHUB_USER,
-                repo: GITHUB_REPO,
-                path,
-                message: `Craigslist ad image archived via JC by June07`,
-                content: content,
-                committer: {
-                    name: GITHUB_USER,
-                    email: `support@${DOMAIN}`
-                }
-            })
+            try {
+                await octokit.repos.createOrUpdateFileContents({
+                    owner: GITHUB_USER,
+                    repo: GITHUB_REPO,
+                    path,
+                    message: `Craigslist ad image archived via JC by June07`,
+                    content: content,
+                    committer: {
+                        name: GITHUB_USER,
+                        email: `support@${DOMAIN}`
+                    }
+                })
+            } catch (error) {
+                error
+            }
         }
     })
+    const indexHTML = `${indexHTMLHead}
+        <ul>
+            <li><a href="${pid}.html">${pid}.html</a></li>
+            ${indexHTMLListItems}
+        </ul>
+        <div id="lightgallery">
+            ${indexHTMLLightGalleryItems}
+        </div>
+        ${indexHTMLFoot}`
 
-    await octokit.repos.createOrUpdateFileContents({
-        owner: GITHUB_USER,
-        repo: GITHUB_REPO,
-        path: `craigslist/${subdir}/index.htm`,
-        message: `Craigslist ad archived via JC by June07`,
-        content: Buffer.from(modifiedHtml).toString('base64'),
-        committer: {
-            name: GITHUB_USER,
-            email: `support@${DOMAIN}`
-        }
-    })
-    return `https://june07.github.io/jc-archive/craigslist/${subdir}/index.htm`
+    try {
+        await octokit.repos.createOrUpdateFileContents({
+            owner: GITHUB_USER,
+            repo: GITHUB_REPO,
+            path: `craigslist/${subdir}/index.htm`,
+            message: `Craigslist ad archived via JC by June07`,
+            content: Buffer.from(indexHTML).toString('base64'),
+            committer: {
+                name: GITHUB_USER,
+                email: `support@${DOMAIN}`
+            }
+        })
+    } catch (error) {
+        error
+    }
+    return `https://jc-archive.june07.com/craigslist/${subdir}/index.htm`
 }
 async function getCommentData(id) {
     const { got } = await import('got')
