@@ -18,7 +18,10 @@ function router(io) {
 
             socket.craigslist = { listingPid, listingURL, listingUUID, clientId }
 
-            await crawlerService.archive(socket.craigslist)
+            const { emitter } = await crawlerService.archive(socket.craigslist)
+            emitter.on('archived', payload => {
+                socket.emit('update', payload)
+            })
         }).on('getArchive', async (listingPid, callback) => {
             if (!listingPid.match(/\d{10}/)?.[0]) {
                 callback(new Error('invalid pid'))

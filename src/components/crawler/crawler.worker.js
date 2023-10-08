@@ -13,13 +13,13 @@ class CrawlerWorker extends EventEmitter {
     constructor() {
         super()
         this.emitter = new EventEmitter()
-        this.emitter.on('archived', async archiveObj => {
-            const { listingURL, html, imageUrls, listingPid } = archiveObj
+        this.emitter.on('crawled', async payload => {
+            const { listingURL, html, imageUrls, listingPid } = payload
 
             // store data in git
             const gitUrl = await githubService.saveAdToPages({ url: listingURL, html, imageUrls })
-            await redis.HSET('archives', listingPid, JSON.stringify(archiveObj))
-            this.emitter.emit('update', { archived: { ...archiveObj, gitUrl } })
+            await redis.HSET('archives', listingPid, JSON.stringify(payload))
+            this.emitter.emit('archived', { archived: { ...payload, gitUrl } })
         })
         this.crawlers = {}
     }
@@ -96,9 +96,9 @@ function getRequestHandler(options) {
             logger.debug({ namespace, message: JSON.stringify({ url: request.url, html, imageUrls }) })
             const filteredOptions = { ...options }
             delete filteredOptions.emitter
-            emitter.emit('archived', { url: request.url, html, imageUrls: Array.from(new Set(imageUrls)), ...filteredOptions })
+            emitter.emit('crawled', { url: request.url, html, imageUrls: Array.from(new Set(imageUrls)), ...filteredOptions })
             const buffer = await page.screenshot()
-            emitter.emit('screenshot', { buffer, uuid })
+            emitter.emit('screenshot', { buffer, uuid: options.listingUUID })
             await page.close()
         }
     }

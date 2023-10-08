@@ -5,10 +5,6 @@ const CrawlerWorker = require('./crawler.worker')
 const crawlerWorker = new CrawlerWorker(redis)
 const namespace = 'jc-backend:crawler:service'
 
-crawlerWorker.emitter.on('update', payload => {
-    crawlerWorker.emitter.emit(`update-${payload?.diff?.uuid || payload?.json?.uuid}`, payload)
-})
-
 const archive = async (options) => {
     const { listingPid } = options
     let cached = await redis.HGET('archives', listingPid)
