@@ -9,26 +9,9 @@ crawlerWorker.emitter.on('update', payload => {
     crawlerWorker.emitter.emit(`update-${payload?.diff?.uuid || payload?.json?.uuid}`, payload)
 })
 
-const get = async (options) => {
-    const { listingURL, searchUUID, nocache } = options
-    let cached = await redis.GET(`cl-json-${searchUUID}`)
-
-    if (cached && !nocache) {
-        cached = JSON.parse(cached)
-        if (await redis.GET(`running-${searchUUID}`)) {
-            logger.debug({ namespace, message: 'crawlee is running already, returning cached response', listingURL })
-        } else {
-            logger.debug({ namespace, message: 'nocache is not set, returning cached response', listingURL })
-        }
-        return { json: cached, isCached: true, emitter: crawlerWorker.emitter }
-    }
-    logger.debug({ namespace, message: 'attempting to crawl...', searchUUID })
-    crawlerWorker.crawl(options)
-    return { emitter: crawlerWorker.emitter }
-}
 const archive = async (options) => {
-    const { listingUUID } = options
-    let cached = await redis.HGET('archives', listingUUID)
+    const { listingPid } = options
+    let cached = await redis.HGET('archives', listingPid)
 
     if (cached) {
         cached = JSON.parse(cached)
@@ -40,6 +23,5 @@ const archive = async (options) => {
 }
 
 module.exports = {
-    get,
     archive
 }

@@ -54,6 +54,23 @@ async function saveAdToPages(options) {
                 plugins: [lgZoom, lgThumbnail, lgShare, lgRotate, lgFullscreen, lgHash, lgComment],
             })
         </script>
+        <script src="https://giscus.app/client.js"
+            data-repo="june07/jc-comments"
+            data-repo-id="R_kgDOKZ-3jA"
+            data-category="Announcements"
+            data-category-id="DIC_kwDOKZ-3jM4CZvZb"
+            data-mapping="specific"
+            data-term="${pid}"
+            data-strict="0"
+            data-reactions-enabled="1"
+            data-emit-metadata="0"
+            data-input-position="bottom"
+            data-theme="preferred_color_scheme"
+            data-lang="en"
+            crossorigin="anonymous"
+            async>
+        </script>
+</script>
     </body>
 </html>`
     try {
@@ -101,20 +118,22 @@ async function saveAdToPages(options) {
             <li><a href="${pid}.html">${pid}.html</a></li>
             ${indexHTMLListItems}
         </ul>
-        <iframe src="7674447830.html" style="
-            width: 100%;
-            height: 2400px;
-            border: none;
-            zoom: 0.50;
-            -moz-transform: scale(0.50);
-            -moz-transform-origin: 0 0;
-            -o-transform: scale(0.50);
-            -o-transform-origin: 0 0;
-            -webkit-transform: scale(0.50);
-            -webkit-transform-origin: 0 0;
-        "></iframe>
         <div id="lightgallery">
             ${indexHTMLLightGalleryItems}
+        </div>
+        <div class="iframe-wrapper" style="height: 500px">
+            <iframe src="${pid}.html" style="
+                width: 100%;
+                height: 100%;
+                border: none;
+                zoom: 0.70;
+                -moz-transform: scale(0.70);
+                -moz-transform-origin: 0 0;
+                -o-transform: scale(0.70);
+                -o-transform-origin: 0 0;
+                -webkit-transform: scale(0.70);
+                -webkit-transform-origin: 0 0;
+            "></iframe>
         </div>
         ${indexHTMLFoot}`
 
