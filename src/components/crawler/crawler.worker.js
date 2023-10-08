@@ -131,19 +131,19 @@ function getRequestHandler(options) {
             for (const listItem of listItems) {
                 const pid = await listItem.evaluate((element) => element.getAttribute('data-pid'))
 
-                if (!await redis.HGET('pids', pid)) {
+                //if (!await redis.HGET('pids', pid)) {
                     redis.HSET('pids', pid, Date.now())
-                    const swipe = await listItem.waitForSelector('.swipe', { timeout: 250, state: 'visible' }).catch(() => null)
+                    const swipe = await listItem.waitForSelector('.swipe', { state: 'visible' }).catch(() => null)
 
                     if (swipe) {
                         await swipe.hover()
-                        const forwardArrow = await listItem.waitForSelector('.slider-forward-arrow', { timeout: 250, state: 'visible' }).catch(() => null)
+                        const forwardArrow = await listItem.waitForSelector('.slider-forward-arrow', { state: 'visible' }).catch(() => null)
 
                         if (forwardArrow) {
                             await forwardArrow.click()
                         }
                     }
-                }
+                //}
             }
             log.info(`Interacted ${request.url}...`)
             const html = await page.content()

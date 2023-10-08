@@ -42,12 +42,14 @@ const parse = async (payload, redis) => {
             }
         }
 
+        let imageUrls = []
         $(element).find('.gallery-inner img').each((_index, element) => {
             const imageUrl = $(element).attr('src')
             if (imageUrl) {
-                json.listings[listingUUID].imageUrls = Array.from(new Set([...json.listings[listingUUID].imageUrls, imageUrl]))
+                imageUrls.push(imageUrl)
             }
         })
+        json.listings[listingUUID].imageUrls = Array.from(new Set(imageUrls))
         json.listings[listingUUID].href = href
         json.listings[listingUUID].title = title
         json.listings[listingUUID].meta = meta

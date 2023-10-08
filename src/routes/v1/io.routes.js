@@ -85,6 +85,7 @@ function router(io) {
             }
             if (!(await redis.SMEMBERS(redisClientsPerUUIDKey)).length) {
                 addNewSearch(listingURL, searchUUID, clientId)
+                /** disable intervals due to CL blocking
                 let cachedInterval = await redis.HGET(`intervalIds`, searchUUID)
                 if (!cachedInterval) {
                     crawlerService.get({
@@ -102,7 +103,7 @@ function router(io) {
                         })
                         _setInterval(socket, searchUUID)
                     }
-                }
+                } */
             }
         }).on('sync', (remoteState) => {
             if (remoteState) {

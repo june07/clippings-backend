@@ -47,12 +47,11 @@ async function saveAdToPages(options) {
         <script src="https://cdn.jsdelivr.net/npm/lightgallery@2/plugins/share/lg-share.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/lightgallery@2/plugins/rotate/lg-rotate.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/lightgallery@2/plugins/fullscreen/lg-fullscreen.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/lightgallery@2/plugins/mediumZoom/lg-medium-zoom.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/lightgallery@2/plugins/hash/lg-hash.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/lightgallery@2/plugins/comment/lg-comment.min.js"></script>
         <script type="text/javascript">
             lightGallery(document.getElementById('lightgallery'), {
-                plugins: [lgZoom, lgThumbnail, lgShare, lgRotate, lgFullscreen, lgMediumZoom, lgHash, lgComment],
+                plugins: [lgZoom, lgThumbnail, lgShare, lgRotate, lgFullscreen, lgHash, lgComment],
             })
         </script>
     </body>
@@ -78,7 +77,7 @@ async function saveAdToPages(options) {
         const path = `craigslist/${subdir}/${filenameBigImage}`
 
         indexHTMLListItems += `<li><a href="${filenameBigImage}">${filenameBigImage}</a></li>`
-        indexHTMLLightGalleryItems += `<a href="${filenameBigImage}"><img src="${filenameBigImage}" /></a>`
+        indexHTMLLightGalleryItems += `<a href="${filenameBigImage}"><img height="150" width="150" src="${filenameBigImage}" /></a>`
         if (content) {
             try {
                 await octokit.repos.createOrUpdateFileContents({
@@ -102,6 +101,18 @@ async function saveAdToPages(options) {
             <li><a href="${pid}.html">${pid}.html</a></li>
             ${indexHTMLListItems}
         </ul>
+        <iframe src="7674447830.html" style="
+            width: 100%;
+            height: 2400px;
+            border: none;
+            zoom: 0.50;
+            -moz-transform: scale(0.50);
+            -moz-transform-origin: 0 0;
+            -o-transform: scale(0.50);
+            -o-transform-origin: 0 0;
+            -webkit-transform: scale(0.50);
+            -webkit-transform-origin: 0 0;
+        "></iframe>
         <div id="lightgallery">
             ${indexHTMLLightGalleryItems}
         </div>
