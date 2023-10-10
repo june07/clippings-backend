@@ -28,7 +28,8 @@ const io = new Server(server, {
         path: "/",
         httpOnly: true,
         sameSite: "strict",
-        secure: true
+        secure: true,
+        domain: config.COOKIE_DOMAIN
     }
 })
 io.use((socket, next) => {
