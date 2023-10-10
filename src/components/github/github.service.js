@@ -55,7 +55,7 @@ async function saveAdToPages(options) {
             })
         </script>
         <script src="https://giscus.app/client.js"
-            data-repo="june07/jc-comments"
+            data-repo="june07/clippings-comments"
             data-repo-id="R_kgDOKZ-3jA"
             data-category="Announcements"
             data-category-id="DIC_kwDOKZ-3jM4CZvZb"
@@ -152,13 +152,13 @@ async function saveAdToPages(options) {
     } catch (error) {
         error
     }
-    return `https://jc-archive.june07.com/craigslist/${subdir}/index.htm`
+    return `https://clippings-archive.june07.com/craigslist/${subdir}/index.htm`
 }
 async function getCommentData(id) {
     const { got } = await import('got')
     const query = `
         query {
-            search(type: DISCUSSION, last: 1, query: "repo:june07/jc-comments in:id:${id}") {
+            search(type: DISCUSSION, last: 1, query: "repo:june07/clippings-comments in:id:${id}") {
                 nodes {
                     ... on Discussion {
                         title

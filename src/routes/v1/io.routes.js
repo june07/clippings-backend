@@ -29,6 +29,9 @@ function router(io) {
             }
             const archive = await redis.HGET('archives', listingPid)
             callback(archive)
+        }).on('getMostRecentListingPids', async (callback) => {
+            const pids = await redis.LRANGE('recent_listings', 0, 10)
+            callback(pids)
         }).on('updateDiscussion', async (giscusDiscussion) => {
             const { id, totalCommentCount } = giscusDiscussion
 

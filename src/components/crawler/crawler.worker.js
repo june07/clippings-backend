@@ -18,7 +18,11 @@ class CrawlerWorker extends EventEmitter {
 
             // store data in git
             const gitUrl = await githubService.saveAdToPages({ url: listingURL, html, imageUrls })
-            await redis.HSET('archives', listingPid, JSON.stringify(payload))
+            const multi = redis.multi()
+            multi.HSET('archives', listingPid, JSON.stringify(payload))
+            multi.LPUSH('recent_listings', listingPid)
+            multi.LTRIM('recent_listings', 0, 9)
+            await multi.exec()
             this.emitter.emit('archived', { archived: { ...payload, gitUrl } })
         })
         this.crawlers = {}
