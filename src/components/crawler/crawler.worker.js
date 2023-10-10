@@ -50,6 +50,10 @@ class CrawlerWorker extends EventEmitter {
                 crawlers[clientId] = await launchCrawler('archive', urls, emitter, options)
             }
 
+            crawlers[clientId].options = {
+                ...crawlers[clientId].options,
+                ...options
+            }
             run(crawlers[clientId], urls)
         } else {
             logger.debug({ namespace, message: `${new Date().toLocaleTimeString()}: queued clientId: ${clientId}` })
@@ -147,10 +151,10 @@ async function launchCrawler(type, urlMap, emitter, options) {
     redis.ZINCRBY(`crawlers`, 1, clientId)
     return crawlerWrapper
 }
-async function run(crawlerWrapper, urlMap) {
+async function run(crawlerWrapper, urlMap, options) {
     const urls = urlMap.map(m => m.split(' ')[1])
     const uuids = urlMap.map(m => m.split(' ')[0])
-    const { crawler, options } = crawlerWrapper
+    const { crawler } = crawlerWrapper
 
     crawler.requestHandler = getRequestHandler({ urlMap, ...options })
     try {
