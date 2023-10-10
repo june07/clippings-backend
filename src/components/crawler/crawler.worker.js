@@ -54,7 +54,7 @@ class CrawlerWorker extends EventEmitter {
                 ...crawlers[clientId].options,
                 ...options
             }
-            run(crawlers[clientId], urls)
+            run(crawlers[clientId], urls, options)
         } else {
             logger.debug({ namespace, message: `${new Date().toLocaleTimeString()}: queued clientId: ${clientId}` })
             redis.HSET(`queued`, clientId, `${listingUUID} ${listingURL}`)
