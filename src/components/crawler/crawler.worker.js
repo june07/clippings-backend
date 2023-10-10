@@ -72,11 +72,6 @@ function getRequestHandler(options) {
         handler = async ({ request, page, log }) => {
             const { emitter } = options
             log.info(`Archiving ${request.url}...`)
-            await Promise.all([
-                page.waitForLoadState('networkidle'),
-                page.waitForLoadState('domcontentloaded'),
-                page.waitForLoadState('load')
-            ])
 
             const html = await page.content()
             const gallery = await page.$('.gallery .swipe')
