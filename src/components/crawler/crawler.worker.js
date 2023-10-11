@@ -4,6 +4,7 @@ const { BrowserName, DeviceCategory, OperatingSystemsName } = require('@crawlee/
 
 const { config, logger, redis } = require('../../config')
 const { githubService } = require('../github')
+const { parserService } = require('../parser')
 
 const namespace = 'jc-backend:crawler:worker'
 const crawleeConfig = Configuration.getGlobalConfig()
@@ -18,10 +19,10 @@ class CrawlerWorker extends EventEmitter {
 
             // store data in git
             const gitUrl = await githubService.saveAdToPages({ url: listingURL, html, imageUrls })
+            const recentListing = await toRecentListing(payload)
             const multi = redis.multi()
             multi.HSET('archives', listingPid, JSON.stringify(payload))
-            multi.LPUSH('recent_listings', listingPid)
-            multi.LTRIM('recent_listings', 0, 9)
+            addSetItem(multi, 'recent_listings', JSON.stringify(recentListing), 10)
             await multi.exec()
             this.emitter.emit('archived', { archived: { ...payload, gitUrl } })
         })
@@ -49,14 +50,9 @@ class CrawlerWorker extends EventEmitter {
             results[1].map(key => redis.HDEL(`queued`, key))
 
             if (!crawlers[clientId]) {
-                crawlers[clientId] = await launchCrawler('archive', urls, emitter, options)
+                crawlers[clientId] = await launchCrawler(emitter, clientId)
             } else if (!numberOfCrawlers || numberOfCrawlers < (userConfig?.crawlerLimit || 1)) {
-                crawlers[clientId] = await launchCrawler('archive', urls, emitter, options)
-            }
-
-            crawlers[clientId].options = {
-                ...crawlers[clientId].options,
-                ...options
+                crawlers[clientId] = await launchCrawler(emitter, clientId)
             }
             run(crawlers[clientId], urls, options)
         } else {
@@ -68,13 +64,64 @@ class CrawlerWorker extends EventEmitter {
 
 module.exports = CrawlerWorker
 
-function getRequestHandler(options) {
-    const { type } = options
-    let handler
+function addSetItem(multi, setKey, item, maxSize) {
+    const currentSize = multi.SCARD(setKey)
 
-    if (type === 'archive') {
-        handler = async ({ request, page, log }) => {
-            const { emitter } = options
+    if (currentSize < maxSize) {
+        multi.SADD(setKey, item)
+    } else {
+        // Prune the Set by removing the first (oldest) member(s).
+        const membersToRemove = currentSize - maxSize + 1
+        for (let i = 0; i < membersToRemove; i++) {
+            multi.SPOP(setKey)
+        }
+
+        // Now, you can safely add the new item to the Set.
+        multi.SADD(setKey, item)
+    }
+}
+
+async function toRecentListing(listing) {
+    const { listingPid, html } = listing
+    const metadata = await parserService.parseMetadata(html)
+
+    return { listingPid, metadata }
+}
+async function launchCrawler(emitter, clientId) {
+    const crawler = new PlaywrightCrawler({
+        launchContext: {
+            useIncognitoPages: true,
+            launchOptions: {
+                args: [
+                    '--no-zygote',
+                    '--single-process',
+                    '--remote-debugging-port=9222',
+                    '--headless=new'
+                ]
+            }
+        },
+        browserPoolOptions: {
+            useFingerprints: true, // this is the default
+            fingerprintOptions: {
+                fingerprintGeneratorOptions: {
+                    browsers: [{
+                        name: BrowserName.edge,
+                        minVersion: 96,
+                    }],
+                    devices: [
+                        DeviceCategory.desktop,
+                    ],
+                    operatingSystems: [
+                        OperatingSystemsName.windows,
+                    ],
+                },
+            },
+        },
+        requestHandlerTimeoutSecs: 60,
+        maxRequestRetries: 1,
+        // Use the requestHandler to process each of the crawled pages.
+        requestHandler: async ({ request, page, log }) => {
+            const { options } = request.userData
             log.info(`Archiving ${request.url}...`)
 
             const html = await page.content()
@@ -97,70 +144,24 @@ function getRequestHandler(options) {
             })
 
             logger.debug({ namespace, message: JSON.stringify({ url: request.url, html, imageUrls }) })
-            const filteredOptions = { ...options }
-            delete filteredOptions.emitter
-            emitter.emit('crawled', { url: request.url, html, imageUrls: Array.from(new Set(imageUrls)), ...filteredOptions })
+            emitter.emit('crawled', { url: request.url, html, imageUrls: Array.from(new Set(imageUrls)), ...options })
             const buffer = await page.screenshot()
             emitter.emit('screenshot', { buffer, uuid: options.listingUUID })
             await page.close()
         }
-    }
-    return handler
-}
-async function launchCrawler(type, urlMap, emitter, options) {
-    const { clientId } = options
-    const requestHandler = getRequestHandler({ type, urlMap, emitter, ...options })
-    const crawlerWrapper = {
-        crawler: new PlaywrightCrawler({
-            launchContext: {
-                useIncognitoPages: true,
-                launchOptions: {
-                    args: [
-                        '--no-zygote',
-                        '--single-process',
-                        '--remote-debugging-port=9222',
-                        '--headless=new'
-                    ]
-                }
-            },
-            browserPoolOptions: {
-                useFingerprints: true, // this is the default
-                fingerprintOptions: {
-                    fingerprintGeneratorOptions: {
-                        browsers: [{
-                            name: BrowserName.edge,
-                            minVersion: 96,
-                        }],
-                        devices: [
-                            DeviceCategory.desktop,
-                        ],
-                        operatingSystems: [
-                            OperatingSystemsName.windows,
-                        ],
-                    },
-                },
-            },
-            requestHandlerTimeoutSecs: 60,
-            maxRequestRetries: 1,
-            // Use the requestHandler to process each of the crawled pages.
-            requestHandler
-        }),
-        options: { type, emitter }
-    }
+    })
     redis.ZINCRBY(`crawlers`, 1, clientId)
-    return crawlerWrapper
+    return crawler
 }
-async function run(crawlerWrapper, urlMap, options) {
+async function run(crawler, urlMap, options) {
     const urls = urlMap.map(m => m.split(' ')[1])
     const uuids = urlMap.map(m => m.split(' ')[0])
-    const { crawler } = crawlerWrapper
 
-    crawler.requestHandler = getRequestHandler({ urlMap, ...options })
     try {
         if (crawler.running) {
-            crawler.addRequests(urls)
+            crawler.addRequests(urls.map(url => ({ url, userData: { options } })))
         } else {
-            await crawler.run(urls)
+            await crawler.run(urls.map(url => ({ url, userData: { options } })))
             crawler.requestQueue.drop()
         }
     } catch (error) {

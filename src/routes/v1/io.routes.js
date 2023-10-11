@@ -9,7 +9,7 @@ const namespace = 'jc-backend:routes:io'
 
 function router(io) {
     logger.info({ namespace, message: 'Setting up io routes...' })
-    io.of('/').on('connection', socket => {
+    const mainNamespace = io.of('/').on('connection', socket => {
         const clientId = `${socket.request.headers['x-forward-for']}_${socket.sessionId}`
 
         socket.on('archive', async (listingURL) => {
@@ -19,8 +19,10 @@ function router(io) {
             socket.craigslist = { listingPid, listingURL, listingUUID, clientId }
 
             const { emitter } = await crawlerService.archive(socket.craigslist)
-            emitter.on('archived', payload => {
+            emitter.on('archived', async payload => {
                 socket.emit('update', payload)
+                const mostRecentListings = await redis.SMEMBERS('recent_listings')
+                mainNamespace.emit('mostRecentListings', mostRecentListings)
             })
         }).on('getArchive', async (listingPid, callback) => {
             if (!listingPid.match(/\d{10}/)?.[0]) {
@@ -29,9 +31,9 @@ function router(io) {
             }
             const archive = await redis.HGET('archives', listingPid)
             callback(archive)
-        }).on('getMostRecentListingPids', async (callback) => {
-            const pids = await redis.LRANGE('recent_listings', 0, 10)
-            callback(pids)
+        }).on('getMostRecentListings', async (callback) => {
+            const mostRecentListings = await redis.SMEMBERS('recent_listings')
+            callback(mostRecentListings)
         }).on('updateDiscussion', async (giscusDiscussion) => {
             const { id, totalCommentCount } = giscusDiscussion
 

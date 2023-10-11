@@ -86,7 +86,7 @@ async function saveAdToPages(options) {
             }
         })
     } catch (error) {
-        error
+        logger.error({ namespace, message: error.message })
     }
     await mapSeries(imageUrls, async url => {
         const content = await downloadImage(url)
@@ -109,7 +109,7 @@ async function saveAdToPages(options) {
                     }
                 })
             } catch (error) {
-                error
+                logger.error({ namespace, message: error.message })
             }
         }
     })
@@ -150,7 +150,7 @@ async function saveAdToPages(options) {
             }
         })
     } catch (error) {
-        error
+        logger.error({ namespace, message: error.message })
     }
     return `https://clippings-archive.june07.com/craigslist/${subdir}/index.htm`
 }

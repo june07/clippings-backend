@@ -5,7 +5,7 @@
     "main": "src/index.js",
     "scripts": {
         "prod": "DEBUG=jc-backend:* node --trace-warnings --inspect=0.0.0.0 src/index.js",
-        "dev": "cross-env NODE_ENV=development DEBUG=jc-backend:*,socket.io* nodemon --trace-warnings --inspect=0.0.0.0 -w src",
+        "dev": "cross-env NODE_ENV=development DEBUG=jc-backend:* nodemon --trace-warnings --inspect=0.0.0.0 -w src",
         "docker:dev": "cross-env docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --remove-orphans",
         "docker:dev:tunnel": "npm-run-all --parallel tunnel docker:dev",
         "tunnel": "node utils/tunnel.js"
