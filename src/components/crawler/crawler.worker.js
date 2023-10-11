@@ -85,7 +85,7 @@ async function toRecentListing(listing) {
     const { listingPid, html } = listing
     const metadata = await parserService.parseMetadata(html)
 
-    return { listingPid, metadata }
+    return { listingPid, metadata, createdAt: Date.now() }
 }
 async function launchCrawler(emitter, clientId) {
     const crawler = new PlaywrightCrawler({
