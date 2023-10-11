@@ -126,22 +126,25 @@ async function launchCrawler(emitter, clientId) {
 
             const html = await page.content()
             const gallery = await page.$('.gallery .swipe')
-            await gallery.hover()
-            await gallery.click()
-            await page.waitForSelector('.gallery.big')
+            const imageUrls = []
+            if (gallery) {
+                await gallery.hover()
+                await gallery.click()
+                await page.waitForSelector('.gallery.big')
 
-            const imageUrls = await page.evaluate(() => {
-                const imageElements = document.querySelectorAll('.gallery.big .slide img')
-                const urls = []
+                imageUrls.push(await page.evaluate(() => {
+                    const imageElements = document.querySelectorAll('.gallery.big .slide img')
+                    const urls = []
 
-                // Loop through the image elements and extract the 'src' attribute
-                imageElements.forEach((img) => {
-                    const url = img.getAttribute('src')
-                    urls.push(url)
-                })
+                    // Loop through the image elements and extract the 'src' attribute
+                    imageElements.forEach((img) => {
+                        const url = img.getAttribute('src')
+                        urls.push(url)
+                    })
 
-                return urls
-            })
+                    return urls
+                }))
+            }
 
             logger.debug({ namespace, message: JSON.stringify({ url: request.url, html, imageUrls }) })
             emitter.emit('crawled', { url: request.url, html, imageUrls: Array.from(new Set(imageUrls)), ...options })
