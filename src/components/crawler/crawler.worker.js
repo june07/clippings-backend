@@ -20,10 +20,8 @@ class CrawlerWorker extends EventEmitter {
             // store data in git
             const gitUrl = await githubService.saveAdToPages({ url: listingURL, html, imageUrls })
             const recentListing = await toRecentListing(payload)
-            const multi = redis.multi()
-            multi.HSET('archives', listingPid, JSON.stringify(payload))
-            addSetItem(multi, 'recent_listings', JSON.stringify(recentListing), 10)
-            await multi.exec()
+            await redis.HSET('archives', listingPid, JSON.stringify(payload))
+            addSetItem('recent_listings', JSON.stringify(recentListing), 10)
             this.emitter.emit('archived', { archived: { ...payload, gitUrl } })
         })
         this.crawlers = {}
@@ -64,20 +62,20 @@ class CrawlerWorker extends EventEmitter {
 
 module.exports = CrawlerWorker
 
-function addSetItem(multi, setKey, item, maxSize) {
-    const currentSize = multi.SCARD(setKey)
+async function addSetItem(setKey, item, maxSize) {
+    const currentSize = await redis.SCARD(setKey)
 
     if (currentSize < maxSize) {
-        multi.SADD(setKey, item)
+        await redis.SADD(setKey, item)
     } else {
         // Prune the Set by removing the first (oldest) member(s).
         const membersToRemove = currentSize - maxSize + 1
         for (let i = 0; i < membersToRemove; i++) {
-            multi.SPOP(setKey)
+            await redis.SPOP(setKey)
         }
 
         // Now, you can safely add the new item to the Set.
-        multi.SADD(setKey, item)
+        await redis.SADD(setKey, item)
     }
 }
 
