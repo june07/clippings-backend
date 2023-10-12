@@ -88,31 +88,33 @@ async function saveAdToPages(options) {
     } catch (error) {
         logger.error({ namespace, message: error.message })
     }
-    await mapSeries(imageUrls, async url => {
-        const content = await downloadImage(url)
-        const filenameBigImage = url.split('/').pop()
-        const path = `craigslist/${subdir}/${filenameBigImage}`
+    if (imageUrls.length) {
+        await mapSeries(imageUrls, async url => {
+            const content = await downloadImage(url)
+            const filenameBigImage = url.split('/').pop()
+            const path = `craigslist/${subdir}/${filenameBigImage}`
 
-        indexHTMLListItems += `<li><a href="${filenameBigImage}">${filenameBigImage}</a></li>`
-        indexHTMLLightGalleryItems += `<a href="${filenameBigImage}"><img height="150" width="150" src="${filenameBigImage}" /></a>`
-        if (content) {
-            try {
-                await octokit.repos.createOrUpdateFileContents({
-                    owner: GITHUB_USER,
-                    repo: GITHUB_REPO,
-                    path,
-                    message: `Craigslist ad image archived via JC by June07`,
-                    content: content,
-                    committer: {
-                        name: GITHUB_USER,
-                        email: `support@${DOMAIN}`
-                    }
-                })
-            } catch (error) {
-                logger.error({ namespace, message: error.message })
+            indexHTMLListItems += `<li><a href="${filenameBigImage}">${filenameBigImage}</a></li>`
+            indexHTMLLightGalleryItems += `<a href="${filenameBigImage}"><img height="150" width="150" src="${filenameBigImage}" /></a>`
+            if (content) {
+                try {
+                    await octokit.repos.createOrUpdateFileContents({
+                        owner: GITHUB_USER,
+                        repo: GITHUB_REPO,
+                        path,
+                        message: `Craigslist ad image archived via JC by June07`,
+                        content: content,
+                        committer: {
+                            name: GITHUB_USER,
+                            email: `support@${DOMAIN}`
+                        }
+                    })
+                } catch (error) {
+                    logger.error({ namespace, message: error.message })
+                }
             }
-        }
-    })
+        })
+    }
     const indexHTML = `${indexHTMLHead}
         <ul>
             <li><a href="${pid}.html">${pid}.html</a></li>
