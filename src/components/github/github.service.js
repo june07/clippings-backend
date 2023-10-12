@@ -156,16 +156,23 @@ async function saveAdToPages(options) {
     }
     return `https://clippings-archive.june07.com/craigslist/${subdir}/index.htm`
 }
-async function getCommentData(id) {
+async function getCommentData(options) {
+    const { id, last } = options
     const { got } = await import('got')
     const query = `
         query {
-            search(type: DISCUSSION, last: 1, query: "repo:june07/clippings-comments in:id:${id}") {
+            search(type: DISCUSSION, last: ${last || 1}, query: "repo:june07/clippings-comments${id ? `in:id:${id}` : ''}") {
                 nodes {
                     ... on Discussion {
                         title
+                        createdAt
                         comments {
                             totalCount
+                        }
+                        comments {
+                            nodes {
+                                body
+                            }
                         }
                     }
                 }
@@ -184,7 +191,7 @@ async function getCommentData(id) {
         logger.error(error)
         return
     }
-    return data?.search?.nodes?.[0]
+    return data?.search?.nodes
 }
 
 module.exports = {

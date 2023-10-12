@@ -43,12 +43,17 @@ function router(io) {
         }).on('getMostRecentListings', async (callback) => {
             const mostRecentListings = await redis.SMEMBERS('recent_listings')
             callback(mostRecentListings)
+        }).on('getMostRecentDiscussions', async (options) => {
+            const { last } = options
+
+            const commentData = await githubService.getCommentData({ last })
+            mainNamespace.emit('mostRecentDiscussions', commentData)
         }).on('updateDiscussion', async (giscusDiscussion) => {
             const { id, totalCommentCount } = giscusDiscussion
 
-            const commentData = await githubService.getCommentData(id)
+            const commentData = await githubService.getCommentData({ id })
             if (commentData?.title) {
-                socket.broadcast.emit('updatedDiscussion', commentData)
+                mainNamespace.emit('updatedDiscussion', commentData)
                 await redis.HSET('commented', commentData.title, totalCommentCount) // commentData.title === pid
             }
         }).on('disconnect', async (reason) => {
