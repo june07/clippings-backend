@@ -15,6 +15,15 @@ function router(io) {
         socket.on('archive', async (listingURL) => {
             const listingUUID = uuidv5(listingURL, uuidv5.URL)
             const listingPid = listingURL.match(/\/([^\/]*)\.htm/)[1]
+            if (!listingPid) {
+                return new Error('invalid pid')
+            }
+            // check to see if it's been done already
+            const archive = await redis.HGET('archives', listingPid)
+            if (archive) {
+                socket.emit('update', { archived: JSON.parse(archive) })
+                return
+            }
 
             socket.craigslist = { listingPid, listingURL, listingUUID, clientId }
 
