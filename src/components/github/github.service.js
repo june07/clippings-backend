@@ -172,6 +172,9 @@ async function getCommentData(options) {
                         comments {
                             nodes {
                                 body
+                                author {
+                                    avatarUrl
+                                }
                             }
                         }
                     }
