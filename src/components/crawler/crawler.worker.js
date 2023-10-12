@@ -146,8 +146,8 @@ async function launchCrawler(emitter, clientId) {
                 }))
             }
 
-            logger.debug({ namespace, message: JSON.stringify({ url: request.url, html, imageUrls }) })
-            emitter.emit('crawled', { url: request.url, html, imageUrls: Array.from(new Set(imageUrls)), ...options })
+            logger.debug({ namespace, message: JSON.stringify({ url: request.url, html, imageUrls: imageUrls.flat() }) })
+            emitter.emit('crawled', { url: request.url, html, imageUrls: Array.from(new Set(imageUrls.flat())), ...options })
             const buffer = await page.screenshot()
             emitter.emit('screenshot', { buffer, uuid: options.listingUUID })
             await page.close()
