@@ -3,7 +3,7 @@ const redis = require('../../config/redis')
 const CrawlerWorker = require('./crawler.worker')
 
 const crawlerWorker = new CrawlerWorker(redis)
-const namespace = 'jc-backend:crawler:service'
+const namespace = 'clippings-backend:crawler:service'
 
 const archive = async (options) => {
     const { listingPid } = options

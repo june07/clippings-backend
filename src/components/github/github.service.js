@@ -4,7 +4,7 @@ const { Octokit } = require("@octokit/rest")
 const { logger } = require('../../config')
 
 const { GITHUB_USER, GITHUB_REPO, GITHUB_TOKEN, DOMAIN } = process.env
-const namespace = 'jc-backend:github:service'
+const namespace = 'clippings-backend:github:service'
 
 async function downloadImage(url) {
     try {

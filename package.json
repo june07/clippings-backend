@@ -13,6 +13,7 @@
     "author": "june07",
     "license": "MIT",
     "dependencies": {
+        "@getbrevo/brevo": "^1.0.1",
         "@octokit/rest": "^20.0.2",
         "async": "^3.2.4",
         "axios": "^1.5.0",

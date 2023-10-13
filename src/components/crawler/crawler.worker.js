@@ -6,7 +6,7 @@ const { config, logger, redis } = require('../../config')
 const { githubService } = require('../github')
 const { parserService } = require('../parser')
 
-const namespace = 'jc-backend:crawler:worker'
+const namespace = 'clippings-backend:crawler:worker'
 const crawleeConfig = Configuration.getGlobalConfig()
 crawleeConfig.set('logLevel', config.NODE_ENV === 'production' ? 'INFO' : 'DEBUG')
 

@@ -1,6 +1,6 @@
 const cheerio = require('cheerio')
 
-const namespace = 'jc-backend:parser:service'
+const namespace = 'clippings-backend:parser:service'
 const parseMetadata = async (html) => {
     const $ = cheerio.load(html)
     const timeElement = $('.postinginfo.reveal')

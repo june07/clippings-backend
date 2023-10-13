@@ -4,8 +4,9 @@ const redis = require('../../config/redis')
 const logger = require('../../config/logger')
 const { crawlerService } = require('../../components/crawler')
 const { githubService } = require('../../components/github')
+const { addContactToDailyList } = require('../../common/services/mail.service')
 
-const namespace = 'jc-backend:routes:io'
+const namespace = 'clippings-backend:routes:io'
 
 function router(io) {
     logger.info({ namespace, message: 'Setting up io routes...' })
@@ -64,6 +65,9 @@ function router(io) {
                 mainNamespace.emit('updatedDiscussion', commentData)
                 await redis.HSET('commented', commentData.title, totalCommentCount) // commentData.title === pid
             }
+        }).on('subscribe-daily', async (email, callback) => {
+            const result = await addContactToDailyList(email)
+            callback(result)
         }).on('disconnect', async (reason) => {
             logger.info({ namespace, message: reason })
         })
