@@ -47,7 +47,15 @@ function router(io) {
             const { last } = options
 
             const commentData = await githubService.getCommentData({ last })
-            mainNamespace.emit('mostRecentDiscussions', commentData)
+            const archiveData = await redis.HMGET('archives', commentData.map(discussion => discussion.title))
+            const data = commentData.map((discussion, index) => {
+                if (archiveData[index] && JSON.parse(archiveData[index])?.url) {
+                    return { ...discussion, url: JSON.parse(archiveData[index]).url }
+                } else {
+                    return discussion
+                }
+            })
+            mainNamespace.emit('mostRecentDiscussions', data)
         }).on('updateDiscussion', async (giscusDiscussion) => {
             const { id, totalCommentCount } = giscusDiscussion
 
