@@ -166,10 +166,8 @@ async function getCommentData(options) {
                     ... on Discussion {
                         title
                         createdAt
-                        comments {
+                        comments(last: 1) {
                             totalCount
-                        }
-                        comments {
                             nodes {
                                 body
                                 author {
