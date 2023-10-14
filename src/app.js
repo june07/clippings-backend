@@ -15,6 +15,7 @@ const redis = require('./config/redis')
 
 const { authLimiter } = require('./middleware/rateLimiter')
 const { errorConverter, errorHandler } = require('./middleware/error')
+require('./common/services/cron.service')
 
 const app = express()
 const sessionStore = MongoStore.create({ mongoUrl: config.MONGODB_URI })

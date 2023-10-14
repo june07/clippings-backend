@@ -1,4 +1,5 @@
 require('dd-trace').init()
+const mongoose = require('mongoose')
 const inspector = require('node:inspector')
 const { Server } = require('socket.io')
 const https = require('https')
@@ -8,6 +9,10 @@ const app = require('./app')
 const logger = require('./config/logger')
 const config = require('./config/config')
 const ioRouter = require('./routes/v1/io.routes')
+
+mongoose.connect(config.MONGODB_URI).then(() => {
+    logger.info('Connected to MongoDB')
+})
 
 const server = https.createServer({
     key: fs.readFileSync('./cert.pem', 'utf8'),
