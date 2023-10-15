@@ -4,6 +4,8 @@ const redis = require('../../config/redis')
 const logger = require('../../config/logger')
 const { crawlerService } = require('../../components/crawler')
 const { githubService } = require('../../components/github')
+const { contactController } = require('../../components/contact')
+const { alertController } = require('../../components/alert')
 const { addContactToDailyList } = require('../../common/services/mail.service')
 
 const namespace = 'clippings-backend:routes:io'
@@ -13,7 +15,22 @@ function router(io) {
     const mainNamespace = io.of('/').on('connection', socket => {
         const clientId = `${socket.request.headers['x-forward-for']}_${socket.sessionId}`
 
-        socket.on('archive', async (listingURL) => {
+        socket.on('updateContact', async (params) => {
+            contactController.updateContact(params, socket)
+        })
+        .on('deleteContact', async (params) => {
+            contactController.deleteContact(params, socket)
+        })
+        .on('setEmergencyAlert', async (params) => {
+            alertController.setEmergencyAlert(params, socket)
+        })
+        .on('clearEmergencyAlert', async (id) => {
+
+        })
+        .on('getArchive', async (listingPid, callback) => {
+            callback(await redis.HGET('archives', listingPid))
+        })
+        .on('archive', async (listingURL) => {
             const listingUUID = uuidv5(listingURL, uuidv5.URL)
             const listingPid = listingURL.match(/\/([^\/]*)\.htm/)[1]
             if (!listingPid) {
