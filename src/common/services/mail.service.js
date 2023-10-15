@@ -37,7 +37,7 @@ async function sendTransacEmail(type, options) {
         let sendSmtpEmail = new Brevo.SendSmtpEmail()
 
         sendSmtpEmail = {
-            to: config.NODE_ENV === 'production' ? nonBlacklistedEmailAddresses : [{ email: config.TEST_EMAIL_RECIPIENT }],
+            bcc: config.NODE_ENV === 'production' ? nonBlacklistedEmailAddresses : [{ email: config.TEST_EMAIL_RECIPIENT }],
             templateId: 16,
             params: {
                 ads: options.ads,
