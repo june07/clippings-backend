@@ -28,7 +28,13 @@ function router(io) {
 
         })
         .on('getArchive', async (listingPid, callback) => {
-            callback(await redis.HGET('archives', listingPid))
+            const archive = await redis.HGET('archives', listingPid)
+
+            if (!archive) {
+                // get it from mongoose and maybe move it back to archives or a different cache?!
+                
+            }
+            callback(archive)
         })
         .on('archive', async (listingURL) => {
             const listingUUID = uuidv5(listingURL, uuidv5.URL)

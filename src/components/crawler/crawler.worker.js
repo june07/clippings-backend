@@ -22,6 +22,7 @@ class CrawlerWorker extends EventEmitter {
             const recentListing = await toRecentListing(payload)
             await redis.HSET('archives', listingPid, JSON.stringify({
                 createdAt: recentListing.createdAt,
+                metadata: recentListing.metadata,
                 ...payload
             }))
             addSetItem('recent_listings', JSON.stringify(recentListing), 10)

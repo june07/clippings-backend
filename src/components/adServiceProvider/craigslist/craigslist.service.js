@@ -1,50 +1,52 @@
-const redis = require('../../../config/redis')
+const { config, logger, redis } = require('../../../config')
 const CraigslistListing = require('./craigslistListing.model')
 
-async function transferData() {
-    const yesterday = new Date()
+const namespace = 'clippings-backend:craigslist:service'
 
-    yesterday.setDate(yesterday.getDate() - 1)
+async function transferData() {
+    const today = new Date()
+    const yesterday = new Date(new Date().setDate(today.getDate() - 1))
+
+    const yesterdayEnd = new Date(yesterday.setHours(23, 59, 59, 999))
 
     try {
-        // Get all fields from the 'recent_listings' Redis HASH
-        const redisFields = (await redis.SMEMBERS('recent_listings')).map(field => JSON.parse(field))
+        const archives = await redis.HGETALL('archives')
 
         // Create an array to store the keys that have been successfully saved
-        const savedKeys = []
+        const savedArchives = []
 
         // Loop through the Redis fields
-        for (const field in redisFields) {
-            const { listingPid, createdAt, metadata } = redisFields[field]
+        for (const archive of Object.values(archives)) {
+            const archiveObj = JSON.parse(archive)
+            const { listingPid, createdAt } = archiveObj
 
             // Check if the field contains a valid 'createdAt' timestamp
             if (!isNaN(createdAt)) {
                 const createdAtDate = new Date(createdAt)
 
-                if (createdAtDate <= yesterday) {
-                    // Create a new CraigslistListing document
-                    const metadataString = JSON.stringify(metadata)
-                    delete redisFields[field].metadata
-
+                if (createdAtDate <= yesterdayEnd) {
                     // Save the document to MongoDB
                     listing = await CraigslistListing.findOneAndUpdate({ listingPid }, {
-                        metadata: metadataString,
-                        ...redisFields[field]
+                        listingPid,
+                        json: archive
                     }, { upsert: true, new: true, lean: true })
-                    savedKeys.push(field)
+                    savedArchives.push(archiveObj)
                     console.log(`Saved Craigslist listing with createdAt: ${listingPid}`)
                 }
             }
         }
 
-        // Remove successfully saved keys from Redis
-        if (savedKeys.length > 0) {
-            await redis.HDEL('recent_listings', ...savedKeys)
-            console.log(`Removed saved keys from Redis: ${savedKeys}`)
-        }
-        return redisFields.map(ad => ({ ...ad, url: `https://clippings-archive.june07.com/craigslist/${ad.pid}` }))
+        // Move saved keys from more active cache to less active
+        await Promise.all(savedArchives.map(archive => {
+            const multi = redis.multi()
+            multi.HSET('archives-older', archive.listingPid, JSON.stringify(archive))
+            multi.HDEL('archives', archive.listingPid)
+            return multi.exec()
+        }))
+
+        return savedArchives.map(archive => ({ ...archive, url: `https://clippings.june07.com/archive/cl/${archive.listingPid}` }))
     } catch (error) {
-        console.error('Error transferring data:', error)
+        logger.error({ namespace, message: 'Error transferring data:', error })
     }
 }
 function filterYesterdays(listings) {
@@ -52,15 +54,19 @@ function filterYesterdays(listings) {
     const yesterday = new Date(new Date().setDate(today.getDate() - 1))
 
     const yesterdayStart = yesterday.setHours(0, 0, 0, 0)
-    const yesterdayEnd = yesterday.setHours(23, 59, 59, 999);
+    const yesterdayEnd = yesterday.setHours(23, 59, 59, 999)
 
     return listings.filter(listing => {
         createdAtDate = new Date(listing.createdAt)
-        
+
         if (createdAtDate >= yesterdayStart && createdAtDate < yesterdayEnd) {
             return listing
         }
     })
+}
+
+if (config.NODE_ENV !== 'production') {
+    global.transferData = transferData
 }
 
 module.exports = {
