@@ -28,6 +28,10 @@ function router(io) {
 
         })
         .on('getArchive', async (listingPid, callback) => {
+            if (!listingPid.match(/\d{10}/)?.[0]) {
+                callback(new Error('invalid pid'))
+                return
+            }
             let archive = await redis.HGET('archives', listingPid)
 
             if (!archive) {
@@ -57,13 +61,6 @@ function router(io) {
                 const mostRecentListings = await redis.SMEMBERS('recent_listings')
                 mainNamespace.emit('mostRecentListings', mostRecentListings)
             })
-        }).on('getArchive', async (listingPid, callback) => {
-            if (!listingPid.match(/\d{10}/)?.[0]) {
-                callback(new Error('invalid pid'))
-                return
-            }
-            const archive = await redis.HGET('archives', listingPid)
-            callback(archive)
         }).on('getMostRecentListings', async (callback) => {
             const mostRecentListings = await redis.SMEMBERS('recent_listings')
             callback(mostRecentListings)
