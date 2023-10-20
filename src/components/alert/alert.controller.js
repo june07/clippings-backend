@@ -12,12 +12,12 @@ async function createAlert(params, socket) {
         socket.emit('alertCreated', alert)
     }
 }
-async function readAlerts(socket) {
+async function readAlerts(socket, callback) {
     const owner = socket.sessionId
 
     const alerts = await alertService.readAlerts(owner)
     
-    return alerts
+    callback(alerts)
 }
 async function updateAlert(params, socket) {
     const { _id, owner, listingPid, from, to, sendAt } = params
@@ -33,8 +33,8 @@ async function updateAlert(params, socket) {
 async function deleteAlert(params, socket) {
     const { _id } = params
 
-    const alert = await alertService.deleteAlert(_id)
-    socket.emit('alertDeleted', alert)
+    await alertService.deleteAlert(_id)
+    socket.emit('alertDeleted', _id)
 }
 
 module.exports = {

@@ -17,9 +17,7 @@ const createAlert = {
     payload: Joi.object().keys(alert)
 }
 const readAlerts = {
-    payload: Joi.object().keys({
-        owner: Joi.string().required()
-    })
+    payload: Joi.object().keys({})
 }
 const updateAlert = {
     payload: Joi.object().keys({

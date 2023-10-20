@@ -35,8 +35,8 @@ function router(io) {
             validatePayload(payload, messageValidations.deleteMessage, (error) => !error ? messageController.deleteMessage(payload, socket) : logger.error(error))
         }).on('createAlert', async (payload) => {
             validatePayload(payload, alertValidations.createAlert, (error) => !error ? alertController.createAlert(payload, socket) : logger.error(error))
-        }).on('readAlerts', async (payload) => {
-            validatePayload(payload, alertValidations.readAlerts, (error) => !error ? alertController.readAlerts(payload, socket) : logger.error(error))
+        }).on('readAlerts', async (payload, callback) => {
+            validatePayload(payload, alertValidations.readAlerts, (error) => !error ? alertController.readAlerts(socket, callback) : logger.error(error))
         }).on('updateAlert', async (payload) => {
             validatePayload(payload, alertValidations.updateAlert, (error) => !error ? alertController.updateAlert(payload, socket) : logger.error(error))
         }).on('deleteAlert', async (payload) => {

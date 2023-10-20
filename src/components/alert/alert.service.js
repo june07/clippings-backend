@@ -16,6 +16,10 @@ async function createAlert(owner, listingPid, from, to, sendAt) {
 }
 async function readAlerts(owner) {
     const alerts = await AlertModel.find({ owner }, { '__v': 0 }, { lean: true })
+        .populate({
+            path: 'to',
+            select: { '__v': 0, '_id': 0 }
+        })
     return alerts
 }
 async function updateAlert(_id, owner, listingPid, from, to, sendAt) {
