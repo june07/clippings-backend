@@ -55,15 +55,18 @@ io.use((socket, next) => {
     if (sessionId) {
         // find existing session
         app.sessionStore.get(sessionId, (error, session) => {
+            if (error) {
+                logger.error({ namespace, message: error.message || error })
+            }
             if (session) {
                 socket.sessionId = sessionId
                 next()
             } else {
-                next('no sesssion')
+                next(new Error('no matching sesssionId found'))
             }
         })
     } else {
-        next('no session')
+        next(new Error('no sesssionId provided'))
     }
 })
 io.on('connection', (socket) => {
