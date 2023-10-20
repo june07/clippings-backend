@@ -17,10 +17,6 @@ function router(io) {
     const mainNamespace = io.of('/').on('connection', async socket => {
         const clientId = `${socket.request.headers['x-forward-for']}_${socket.sessionId}`
 
-        socket.emit('emergencyContact', {
-            contacts: await contactController.readContacts(socket),
-            messages: await messageController.readMessages(socket),
-        })
         socket.on('getEmergencyContacts', async () => {
             return await contactController.readContacts(socket)
         }).on('createContact', async (payload) => {
@@ -107,6 +103,11 @@ function router(io) {
             callback(result)
         }).on('disconnect', async (reason) => {
             logger.info({ namespace, message: reason })
+        })
+
+        socket.emit('emergencyContact', {
+            contacts: await contactController.readContacts(socket),
+            messages: await messageController.readMessages(socket),
         })
     })
 }
