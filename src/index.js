@@ -62,11 +62,11 @@ io.use((socket, next) => {
                 socket.sessionId = sessionId
                 next()
             } else {
-                next(new Error('no matching sesssionId found'))
+                next(new Error('no matching sessionId found'))
             }
         })
     } else {
-        next(new Error('no sesssionId provided'))
+        next(new Error('no sessionId provided'))
     }
 })
 io.on('connection', (socket) => {
