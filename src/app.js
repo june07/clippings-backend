@@ -18,7 +18,11 @@ const { errorConverter, errorHandler } = require('./middleware/error')
 require('./common/services/cron.service')
 
 const app = express()
-const sessionStore = MongoStore.create({ mongoUrl: config.MONGODB_URI })
+const sessionStore = MongoStore.create({
+    mongoUrl: config.MONGODB_URI,
+    touchAfter: config.NODE_ENV === 'production' ? 24 * 3600 : 0,
+    ttl: 365 * 24 * 3600
+})
 
 app.use(cookieParser())
 
@@ -89,6 +93,7 @@ app.use(session({
         httpOnly: false,
         secure: true,
         domain: config.COOKIE_DOMAIN,
+        maxAge: 31536000000
     }
 }))
 app.sessionStore = sessionStore
