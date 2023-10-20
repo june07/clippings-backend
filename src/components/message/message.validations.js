@@ -3,7 +3,7 @@ const { objectId } = require('../../common/validations/joi.validations')
 
 const message = {
     text: Joi.string().required(),
-    title: Joi.string().required(),
+    title: Joi.string(),
 }
 const createMessage = {
     payload: Joi.object().keys(message)

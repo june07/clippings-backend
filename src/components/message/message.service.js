@@ -4,7 +4,7 @@ const MessageModel = require('./message.model')
 
 const cache = new LRUCache({ max: 500 })
 
-async function createMessage(owner, text) {
+async function createMessage(owner, text, title) {
     const message = await MessageModel.create({ owner, text, title })
     return message
 }

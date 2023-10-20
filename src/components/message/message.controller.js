@@ -1,7 +1,10 @@
 const messageService = require('./message.service')
 
 async function createMessage(params, socket) {
-    const { text, title } = params
+    const { customAlphabet } = await import('nanoid')
+    const titleId = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ', 3)
+
+    const { text, title = `Message ${titleId()}` } = params
     const owner = socket.sessionId
 
     const message = await messageService.createMessage(owner, text, title)
