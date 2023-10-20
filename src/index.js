@@ -9,9 +9,22 @@ const app = require('./app')
 const logger = require('./config/logger')
 const config = require('./config/config')
 const ioRouter = require('./routes/v1/io.routes')
+const { MessageModel } = require('./components/message')
+
+const namespace = 'clippings-backend:index'
 
 mongoose.connect(config.MONGODB_URI).then(() => {
     logger.info('Connected to MongoDB')
+
+    MessageModel.create({
+        owner: 'system',
+        title: 'default alert message',
+        text: `I am lost and my last known action was going to visit someone from this online classified ad...`
+    }).catch(error => {
+        if (error.code != 11000) {
+            logger.error({ namespace, message: error.message })
+        }
+    })
 })
 
 const server = https.createServer({

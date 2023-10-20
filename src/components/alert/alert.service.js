@@ -1,25 +1,41 @@
-const { default: mongoose } = require('mongoose')
 const AlertModel = require('./alert.model')
 
-async function setEmergencyAlert(listingPid, from, to, sendAt) {
-
+async function createAlert(owner, listingPid, from, to, sendAt) {
+    try {
+        const alert = await AlertModel.create({
+            owner,
+            listingPid,
+            from,
+            to,
+            sendAt
+        })
+        return alert
+    } catch (error) {
+        return error
+    }
+}
+async function readAlerts(owner) {
+    const alerts = await AlertModel.find({ owner }, { '__v': 0 }, { lean: true })
+    return alerts
+}
+async function updateAlert(_id, owner, listingPid, from, to, sendAt) {
     const alertObj = {
-        createdAt: new Date(),
+        owner,
         listingPid,
-        from: from instanceof mongoose.Types.ObjectId ? from : {
-            _id: new mongoose.Types.ObjectId(),
-            ...from
-        },
-        to: to.map(to => to instanceof mongoose.Types.ObjectId ? to : {
-            _id: new mongoose.Types.ObjectId(),
-            ...from
-        }),
+        from,
+        to,
         sendAt
     }
-    const alert = await AlertModel.findOneAndUpdate({ listingPid }, alertObj, { lean: true, new: true, upsert: true })
-    return alert
+    const alert = await AlertModel.findOneAndUpdate({ _id }, alertObj, { lean: true, new: true, upsert: true })
+    return { ...alert, _id: alert._id.toString() }
+}
+async function deleteAlert(_id) {
+    await AlertModel.findByIdAndDelete(_id)
 }
 
 module.exports = {
-    setEmergencyAlert
+    readAlerts,
+    createAlert,
+    updateAlert,
+    deleteAlert
 }

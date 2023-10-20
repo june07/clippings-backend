@@ -1,11 +1,11 @@
 const mongoose = require('mongoose')
 
 const contactSchema = new mongoose.Schema({
-    id: { type: String, unique: true },
-    name: String,
-    email: String,
+    owner: { type: String, required: true },
+    name: { type: String, required: true },
+    email: { type: String, required: true },
     phone: String,
-    relationship: String
-}).index({ id: 1 })
+    relationship: { type: String, required: true },
+})
 
 module.exports = mongoose.model('Contact', contactSchema)

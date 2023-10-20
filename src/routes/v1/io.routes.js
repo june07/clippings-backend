@@ -4,30 +4,48 @@ const redis = require('../../config/redis')
 const logger = require('../../config/logger')
 const { crawlerService } = require('../../components/crawler')
 const { githubService } = require('../../components/github')
-const { contactController } = require('../../components/contact')
-const { alertController } = require('../../components/alert')
+const { contactController, contactValidations } = require('../../components/contact')
+const { messageController, messageValidations } = require('../../components/message')
+const { alertController, alertValidations } = require('../../components/alert')
 const { addContactToDailyList } = require('../../common/services/mail.service')
+const { validatePayload } = require('../../middleware')
 
 const namespace = 'clippings-backend:routes:io'
 
 function router(io) {
     logger.info({ namespace, message: 'Setting up io routes...' })
-    const mainNamespace = io.of('/').on('connection', socket => {
+    const mainNamespace = io.of('/').on('connection', async socket => {
         const clientId = `${socket.request.headers['x-forward-for']}_${socket.sessionId}`
 
-        socket.on('updateContact', async (params) => {
-            contactController.updateContact(params, socket)
+        socket.emit('emergencyContact', {
+            contacts: await contactController.readContacts(socket),
+            messages: await messageController.readMessages(socket),
         })
-        .on('deleteContact', async (params) => {
-            contactController.deleteContact(params, socket)
-        })
-        .on('setEmergencyAlert', async (params) => {
-            alertController.setEmergencyAlert(params, socket)
-        })
-        .on('clearEmergencyAlert', async (id) => {
-
-        })
-        .on('getArchive', async (listingPid, callback) => {
+        socket.on('getEmergencyContacts', async () => {
+            return await contactController.readContacts(socket)
+        }).on('createContact', async (payload) => {
+            validatePayload(payload, contactValidations.createContact, (error) => !error ? contactController.createContact(payload, socket) : logger.error(error))
+        }).on('updateContact', async (payload) => {
+            validatePayload(payload, contactValidations.updateContact, (error) => !error ? contactController.updateContact(payload, socket) : logger.error(error))
+        }).on('deleteContact', async (payload) => {
+            validatePayload(payload, contactValidations.deleteContact, (error) => !error ? contactController.deleteContact(payload, socket) : logger.error(error))
+        }).on('createMessage', async (payload) => {
+            validatePayload(payload, messageValidations.createMessage, (error) => !error ? messageController.createMessage(payload, socket) : logger.error(error))
+        }).on('getEmergencyMessages', async (payload) => {
+            validatePayload(payload, messageValidations.readMessages, (error) => !error ? messageController.readMessages(payload, socket) : logger.error(error))
+        }).on('updateMessage', async (payload) => {
+            validatePayload(payload, messageValidations.updateMessage, (error) => !error ? messageController.updateMessage(payload, socket) : logger.error(error))
+        }).on('deleteMessage', async (payload) => {
+            validatePayload(payload, messageValidations.deleteMessage, (error) => !error ? messageController.deleteMessage(payload, socket) : logger.error(error))
+        }).on('createAlert', async (payload) => {
+            validatePayload(payload, alertValidations.createAlert, (error) => !error ? alertController.createAlert(payload, socket) : logger.error(error))
+        }).on('readAlerts', async (payload) => {
+            validatePayload(payload, alertValidations.readAlerts, (error) => !error ? alertController.readAlerts(payload, socket) : logger.error(error))
+        }).on('updateAlert', async (payload) => {
+            validatePayload(payload, alertValidations.updateAlert, (error) => !error ? alertController.updateAlert(payload, socket) : logger.error(error))
+        }).on('deleteAlert', async (payload) => {
+            validatePayload(payload, alertValidations.deleteAlert, (error) => !error ? alertController.deleteAlert(payload, socket) : logger.error(error))
+        }).on('getArchive', async (listingPid, callback) => {
             if (!listingPid.match(/\d{10}/)?.[0]) {
                 callback(new Error('invalid pid'))
                 return
@@ -39,8 +57,7 @@ function router(io) {
                 archive = await redis.HGET('archives-older', listingPid)
             }
             callback(archive)
-        })
-        .on('archive', async (listingURL) => {
+        }).on('archive', async (listingURL) => {
             const listingUUID = uuidv5(listingURL, uuidv5.URL)
             const listingPid = listingURL.match(/\/([^\/]*)\.htm/)[1]
             if (!listingPid) {
