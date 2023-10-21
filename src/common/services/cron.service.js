@@ -40,6 +40,8 @@ const sendAlertsCron = new CronJob(
     'America/Los_Angeles'
 )
 
+global.cacheAlerts = alertService.cacheAlerts
+
 transactEmailCron.start()
 cacheAlertsCron.start()
 sendAlertsCron.start()

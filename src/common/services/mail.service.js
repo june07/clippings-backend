@@ -84,7 +84,12 @@ async function sendAlert(contacts, alert, callback) {
             .then(data => {
                 logger.info({ namespace, message: 'Woohoo! You just sent your first mailing!' })
                 callback({
-                    sentOn: Date.now(),
+                    receipt: {
+                        id: data.id,
+                        sentAt: Date.now()
+                    },
+                    message: alert.message._id,
+                    to: alert.to.map(to => to._id),
                     ...alert
                 })
             })
@@ -95,7 +100,10 @@ async function sendAlert(contacts, alert, callback) {
         : (() => {
             logger.info({ namespace, message: `sparky.transmissions.send(${JSON.stringify(options, null, '  ')})` })
             callback({
-                sentAt: Date.now(),
+                receipt: {
+                    id: `[(id) only generated in production]`,
+                    sentAt: Date.now()
+                },
                 ...alert
             })
         })()

@@ -23,11 +23,11 @@ async function readAlerts(owner) {
     const alerts = await AlertModel.find({ owner }, { '__v': 0 }, { lean: true })
         .populate({
             path: 'to',
-            select: { '__v': 0, '_id': 0 }
+            select: { '__v': 0 }
         })
         .populate({
             path: 'message',
-            select: { '__v': 0, '_id': 0 }
+            select: { '__v': 0 }
         })
     return alerts
 }
@@ -44,17 +44,20 @@ async function updateAlert(_id, owner, listingPid, from, to, message, sendAt) {
     return { ...alert, _id: alert._id.toString() }
 }
 async function deleteAlert(_id) {
-    await AlertModel.findByIdAndDelete(_id)
+    const alert = await AlertModel.findById(_id)
+    if (!alert.receipt) {
+        await alert.deleteOne()
+    }
 }
-async function cacheAlerts(timeRangeMs) {
+async function cacheAlerts(timeRangeMs = 0) {
     const alerts = await AlertModel.find({ sendAt: { $gte: Date.now() - timeRangeMs } }, { '__v': 0 }, { lean: true })
         .populate({
             path: 'to',
-            select: { '__v': 0, '_id': 0 }
+            select: { '__v': 0 }
         })
         .populate({
             path: 'message',
-            select: { '__v': 0, '_id': 0 }
+            select: { '__v': 0 }
         })
     await redis.SET('alerts', JSON.stringify(alerts), { EX: 3600 })
 }
@@ -63,7 +66,7 @@ async function sendAlerts() {
 
     if (!alertsJSON) return
     const alerts = JSON.parse(alertsJSON)
-    const alertsToSend = alerts.filter(alert => Date.parse(alert.sendAt) >= Date.now() && !alerts.sentAt)
+    const alertsToSend = alerts.filter(alert => Date.parse(alert.sendAt) <= Date.now() && !alerts.receipt)
 
     alertsToSend.map(alert => {
         const contactsToEmail = alert.to.filter(contact => contact.email)
