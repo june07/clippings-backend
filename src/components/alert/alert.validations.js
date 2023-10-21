@@ -7,11 +7,8 @@ const alert = {
     to: Joi.array().items(
         objectId.required()
     ),
-    message: Joi.alternatives().try(
-        objectId.required(),
-        Joi.string().required()
-    ),
-    sendAt: Joi.date().required(),
+    message: objectId.required(),
+    sendAt: Joi.date().min(Date.now() + 3600000).required()
 }
 const createAlert = {
     payload: Joi.object().keys(alert)
@@ -21,14 +18,14 @@ const readAlerts = {
 }
 const updateAlert = {
     payload: Joi.object().keys({
-        _id: objectId,
+        _id: objectId.required(),
         owner: Joi.string().required(),
         ...alert
     })
 }
 const deleteAlert = {
     payload: Joi.object().keys({
-        _id: objectId,
+        _id: objectId.required(),
     })
 }
 

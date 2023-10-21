@@ -1,7 +1,9 @@
 const Brevo = require('@getbrevo/brevo')
+const SparkPost = require('sparkpost')
 
 const config = require('../../config/config')
 const logger = require('../../config/logger')
+const { adService } = require('../../components/ad')
 
 const namespace = 'clippings-backend:mail:service'
 const defaultClient = Brevo.ApiClient.instance
@@ -9,6 +11,7 @@ let apiKey = defaultClient.authentications['api-key']
 apiKey.apiKey = config.SENDINBLUE_API_KEY
 const transactionalEmailApiInstance = new Brevo.TransactionalEmailsApi()
 const contactsApiInstance = new Brevo.ContactsApi()
+const sparky = new SparkPost(config.SPARKPOST_API_KEY)
 
 async function addContactToDailyList(email) {
     const list = { name: 'daily', id: 14, templateId: 18 }
@@ -56,10 +59,54 @@ async function sendTransacEmail(type, options) {
         }
     )
 }
+async function sendContactConfirmation(contact) {
+
+}
+async function sendAlert(contacts, alert, callback) {
+    const archivedListing = await adService.getArchivedAd(alert.listingPid)
+    const options = {
+        content: {
+            from: 'noreply@june07.com',
+            subject: `Emergency Alert from ${alert.from}`,
+            html: `<html><body>
+    <p>This alert was created by ${alert.from} to be sent in an emergency.</p>
+    
+    <p>${alert.from} met up with someone from this online classified ad listing: ${archivedListing.url}</p>
+    
+    <p>More information about the ad can be found at https://clippings.june07.com/alert/${alert._id}</p>
+</body></html>`
+        },
+        recipients: contacts.map(contact => ({ name: contact.name, address: contact.email }))
+    }
+
+    config.NODE_ENV === 'production'
+        ? sparky.transmissions.send(options)
+            .then(data => {
+                logger.info({ namespace, message: 'Woohoo! You just sent your first mailing!' })
+                callback({
+                    sentOn: Date.now(),
+                    ...alert
+                })
+            })
+            .catch(err => {
+                logger.info({ namespace, message: err })
+                callback()
+            })
+        : (() => {
+            logger.info({ namespace, message: `sparky.transmissions.send(${JSON.stringify(options, null, '  ')})` })
+            callback({
+                sentAt: Date.now(),
+                ...alert
+            })
+        })()
+}
+
 if (config.NODE_ENV !== 'production') {
     global.sendTransacEmail = sendTransacEmail
 }
 module.exports = {
     addContactToDailyList,
-    sendTransacEmail
+    sendTransacEmail,
+    sendContactConfirmation,
+    sendAlert
 }

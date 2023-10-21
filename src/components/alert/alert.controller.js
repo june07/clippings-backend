@@ -1,10 +1,10 @@
 const alertService = require('./alert.service')
 
 async function createAlert(params, socket) {
-    const { listingPid, from, to, sendAt } = params
+    const { listingPid, from, to, message, sendAt } = params
     const owner = socket.sessionId
 
-    const alert = await alertService.createAlert(owner, listingPid, from, to, sendAt)
+    const alert = await alertService.createAlert(owner, listingPid, from, to, message, sendAt)
     
     if (alert instanceof Error) {
         socket.emit(alert.message)
@@ -20,14 +20,14 @@ async function readAlerts(socket, callback) {
     callback(alerts)
 }
 async function updateAlert(params, socket) {
-    const { _id, owner, listingPid, from, to, sendAt } = params
+    const { _id, owner, listingPid, from, to, message, sendAt } = params
 
     if (owner !== socket.sessionId) {
         socket.emit(new Error(`can't update a alert owned by someone else.`))
         return
     }
 
-    const alert = await alertService.updateAlert(_id, owner, listingPid, from, to, sendAt)
+    const alert = await alertService.updateAlert(_id, owner, listingPid, from, to, message, sendAt)
     socket.emit('alertUpdated', alert)
 }
 async function deleteAlert(params, socket) {

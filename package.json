@@ -44,6 +44,7 @@
         "playwright": "^1.38.1",
         "redis": "^4.6.5",
         "socket.io": "^4.6.1",
+        "sparkpost": "^2.1.4",
         "stripe": "^12.13.0",
         "uuid": "^9.0.0",
         "web-push": "^3.5.0",
