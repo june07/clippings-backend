@@ -29,8 +29,8 @@ async function updateContact(params, socket) {
 async function deleteContact(params, socket) {
     const { _id } = params
 
-    const contact = await contactService.deleteContact(_id)
-    socket.emit('contactDeleted', contact)
+    await contactService.deleteContact(_id)
+    socket.emit('contactDeleted', { _id })
 }
 
 module.exports = {

@@ -2,7 +2,11 @@ const ContactModel = require('./contact.model')
 
 async function createContact(owner, name, email, phone, relationship) {
     const contact = await ContactModel.create({ owner, name, email, phone, relationship })
-    return contact
+
+    const lean = contact.toObject({ getters: true, virtuals: true })
+    delete lean.__v
+
+    return lean
 }
 async function readContacts(owner) {
     const contacts = await ContactModel.find({ owner }, { '__v': 0 }, { lean: true })
