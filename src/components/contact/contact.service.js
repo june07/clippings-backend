@@ -18,7 +18,7 @@ async function createContact(ownerContactId, name, email, phone, relationship) {
 return lean
 }
 async function readContacts(ownerId) {
-    const contacts = await ContactModel.find({ owner: ownerId }, { '__v': 0 }, { lean: true })
+    const contacts = await ContactModel.find({ owner: ownerId }, { '__v': 0, 'code': 0 }, { lean: true })
     return contacts
 }
 async function updateContact(_id, ownerId, name, email, phone, relationship) {
