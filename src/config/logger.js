@@ -45,8 +45,4 @@ if (config.NODE_ENV !== 'production') {
     logger.transports.push(debugTransport)
 }
 
-logger.info('info: wtf')
-logger.log({ level: 'info', message: 'info: wtf object' })
-logger.log({ level: 'debug', message: 'debug: wtf object' })
-
 module.exports = logger
