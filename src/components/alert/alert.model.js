@@ -3,7 +3,7 @@ const mongoose = require('mongoose')
 const alertSchema = new mongoose.Schema({
     owner: { type: String, required: true },
     listingPid: Number,
-    from: { type: mongoose.Schema.Types.ObjectId, ref: 'Contact' },
+    from: { type: mongoose.Schema.Types.Mixed, ref: 'Contact' },
     to: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Contact' }],
     message: { type: mongoose.Schema.Types.ObjectId, ref: 'Message' },
     sendAt: Date,

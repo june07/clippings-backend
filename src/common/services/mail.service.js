@@ -103,7 +103,7 @@ async function sendAlert(contacts, alert, callback) {
                 logger.log({ level: 'info', namespace, message: 'Woohoo! You just sent your first mailing!' })
                 callback({
                     receipt: {
-                        id: data.id,
+                        id: data.results.id,
                         sentAt: Date.now()
                     },
                     message: alert.message._id,
