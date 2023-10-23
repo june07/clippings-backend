@@ -74,8 +74,14 @@ async function sendTransacEmail(type, options) {
         logger.log({ level: 'error', namespace, message: 'Could not acquire lock' })
     }
 }
+function providerPathFromURL(url) {
+    if (/craigslist.org/i.test(url)) {
+        return 'cl'
+    }
+}
 async function sendAlert(contacts, alert, callback) {
     const archivedListing = await adService.getArchivedAd(alert.listingPid)
+    const providerPathId = providerPathFromURL(archivedListing.url)
     const options = {
         content: {
             from: 'noreply@june07.com',
@@ -85,7 +91,7 @@ async function sendAlert(contacts, alert, callback) {
     
     <p>${alert.from} met up with someone from this online classified ad listing: ${archivedListing.url}</p>
     
-    <p>More information about the ad can be found at https://clippings.june07.com/alert/${alert._id}</p>
+    <p>More information about the ad can be found at https://clippings.june07.com/archive/${providerPathId}/${archivedListing.listingPid}</p>
 </body></html>`
         },
         recipients: contacts.map(contact => ({ name: contact.name, address: contact.email }))
