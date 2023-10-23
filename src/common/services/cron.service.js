@@ -7,16 +7,18 @@ const { alertService } = require('../../components/alert')
 
 const namespace = 'clippings-backend:cron:service'
 
+const transactEmailCronFunc = async () => {
+    const listings = await craigslistService.transferData()
+    const ads = craigslistService.filterYesterdays(listings)
+
+    if (ads.length) {
+        const id = `daily-${new Date().toLocaleDateString()}`
+        mailService.sendTransacEmail('daily', { id, ads })
+    }
+}
 const transactEmailCron = new CronJob(
     '0 0 0 * * *',
-    async () => {
-        const listings = await craigslistService.transferData()
-        const ads = craigslistService.filterYesterdays(listings)
-
-        if (ads.length) {
-            mailService.sendTransacEmail('daily', { ads })
-        }
-    },
+    transactEmailCronFunc,
     () => logger.info({ namespace, message: 'completed transactEmailCron cron job' }),
     true,
     'America/Los_Angeles'
@@ -41,6 +43,7 @@ const sendAlertsCron = new CronJob(
 )
 
 global.cacheAlerts = alertService.cacheAlerts
+global.transactEmailCronFunc = transactEmailCronFunc
 
 transactEmailCron.start()
 cacheAlertsCron.start()
