@@ -45,7 +45,7 @@ async function updateAlert(_id, owner, listingPid, from, to, message, sendAt) {
 }
 async function deleteAlert(_id) {
     const alert = await AlertModel.findById(_id)
-    if (!alert.receipt) {
+    if (!alert.receipt.sentAt) {
         await alert.deleteOne()
     }
 }
