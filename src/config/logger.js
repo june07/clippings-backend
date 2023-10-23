@@ -26,7 +26,7 @@ const logger = winston.createLogger({
     ),
     transports: [
         new winston.transports.Console({
-            stderrLevels: ['error'],
+            stderrLevels: ['info', 'error'],
         }),
     ],
 })
@@ -44,5 +44,9 @@ if (config.NODE_ENV !== 'production') {
     })
     logger.transports.push(debugTransport)
 }
+
+logger.info('info: wtf')
+logger.log({ level: 'info', message: 'info: wtf object' })
+logger.log({ level: 'debug', message: 'debug: wtf object' })
 
 module.exports = logger
