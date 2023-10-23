@@ -107,16 +107,12 @@ async function sendAlert(contacts, alert, callback) {
 }
 async function sendOptIn(receipient, from, code) {
     const options = {
+        substitution_data: {
+            from,
+            code
+        },
         content: {
-            from: 'noreply@june07.com',
-            subject: `Emergency Contact Designation: Please Confirm`,
-            html: `<html><body>
-    <p>${from} has added you as an emergency contact.</p>
-    
-    <p>Please click the Confirm link below so we know that it's okay to contact you on behalf of ${from} in case of an emergency.</p>
-    
-    <a href="https://clippings.june07.com/contact-confirmation/${code}">Confirm</a>
-</body></html>`
+            template_id: 'clippings-opt-in'
         },
         recipients: [receipient]
     }
