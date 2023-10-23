@@ -68,41 +68,40 @@ async function sendAlerts() {
     const alerts = JSON.parse(alertsJSON)
     const alertsToSend = alerts.filter(alert => Date.parse(alert.sendAt) <= Date.now() && !alert.receipt)
 
-    alertsToSend.map(alert => {
+    alertsToSend.map(async alert => {
         const contactsToEmail = alert.to.filter(contact => contact.optedIn && contact.email)
         const contactsToSMS = alert.to.filter(contact => contact.optedIn && contact.phone)
 
         if (contactsToEmail.length) {
-            redis.SET('mailService.sendAlert', alert._id, { NX: true, PX: 10000 }, (err, result) => {
-                if (!err && result === 'OK') {
-                    // Lock acquired; perform your critical section here
-                    mailService.sendAlert(contactsToEmail, alert, async (sentAlert) => {
-                        const p1 = AlertModel.findOneAndUpdate({ _id: sentAlert._id }, sentAlert)
-                        const index = alerts.findIndex(alert => alert._id === sentAlert._id)
+            try {
+                await redis.SET('mailService.sendAlert', alert._id, { NX: true, PX: 10000 })
+                // Lock acquired; perform your critical section here
+                mailService.sendAlert(contactsToEmail, alert, async (sentAlert) => {
+                    const p1 = AlertModel.findOneAndUpdate({ _id: sentAlert._id }, sentAlert)
+                    const index = alerts.findIndex(alert => alert._id === sentAlert._id)
 
-                        if (index !== -1) {
-                            alerts[index] = sentAlert
-                            await Promise.all([
-                                p1,
-                                redis.SET('alerts', JSON.stringify(alerts))
-                            ])
-                        } else {
-                            await p1
-                        }
+                    if (index !== -1) {
+                        alerts[index] = sentAlert
+                        await Promise.all([
+                            p1,
+                            redis.SET('alerts', JSON.stringify(alerts))
+                        ])
+                    } else {
+                        await p1
+                    }
 
-                        logger.log({ level: 'info', namespace, message: `sent alert ${sentAlert._id}` })
-                    })
-                    // Release the lock when done
-                    client.del(lockKey, (delErr) => {
-                        if (delErr) {
-                            console.error('Error releasing lock:', delErr)
-                        }
-                    })
-                } else {
-                    // Lock not acquired; someone else holds the lock
-                    console.log('Could not acquire lock')
-                }
-            })
+                    logger.log({ level: 'info', namespace, message: `sent alert ${sentAlert._id}` })
+                })
+                // Release the lock when done
+                await redis.del(alert._id, (delErr) => {
+                    if (delErr) {
+                        logger.log({ level: 'error', namespace, message: 'Error releasing lock:', delErr })
+                    }
+                })
+            } catch (error) {
+                // Lock not acquired; someone else holds the lock
+                logger.log({ level: 'error', namespace, message: 'Could not acquire lock' })
+            }
         }
         if (contactsToSMS.length) {
             // handle this later
