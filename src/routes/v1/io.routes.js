@@ -13,7 +13,7 @@ const { validatePayload, ownerFromSession } = require('../../middleware')
 const namespace = 'clippings-backend:routes:io'
 
 function router(io) {
-    logger.info({ namespace, message: 'Setting up io routes...' })
+    logger.log({ level: 'info', namespace, message: 'Setting up io routes...' })
     const mainNamespace = io.of('/').on('connection', async socket => {
         const clientId = `${socket.request.headers['x-forward-for']}_${socket.sessionId}`
 
@@ -111,7 +111,7 @@ function router(io) {
             const result = await addContactToDailyList(email)
             callback(result)
         }).on('disconnect', async (reason) => {
-            logger.info({ namespace, message: reason })
+            logger.log({ level: 'info', namespace, message: reason })
         })
 
 

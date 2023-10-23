@@ -19,7 +19,7 @@ const transactEmailCronFunc = async () => {
 const transactEmailCron = new CronJob(
     '0 0 0 * * *',
     transactEmailCronFunc,
-    () => logger.info({ namespace, message: 'completed transactEmailCron cron job' }),
+    () => logger.log({ level: 'info', namespace, message: 'completed transactEmailCron cron job' }),
     true,
     'America/Los_Angeles'
 )
@@ -28,7 +28,7 @@ const cacheAlertsCron = new CronJob(
     async () => {
         await alertService.cacheAlerts(3_600_000)        
     },
-    () => logger.info({ namespace, message: 'completed cacheAlertsCron cron job' }),
+    () => logger.log({ level: 'info', namespace, message: 'completed cacheAlertsCron cron job' }),
     true,
     'America/Los_Angeles'
 )
@@ -37,7 +37,7 @@ const sendAlertsCron = new CronJob(
     () => {
         alertService.sendAlerts()
     },
-    () => logger.info({ namespace, message: 'completed sendAlertsCron cron job' }),
+    () => logger.log({ level: 'info', namespace, message: 'completed sendAlertsCron cron job' }),
     true,
     'America/Los_Angeles'
 )
@@ -49,4 +49,4 @@ transactEmailCron.start()
 cacheAlertsCron.start()
 sendAlertsCron.start()
 
-logger.info({ namespace, message: 'started cron service' })
+logger.log({ level: 'info', namespace, message: 'started cron service' })

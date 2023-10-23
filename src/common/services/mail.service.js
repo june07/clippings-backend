@@ -23,7 +23,7 @@ async function addContactToDailyList(email) {
 
     return await new Promise(resolve => {
         contactsApiInstance.createDoiContact(createDoiContact).then(function () {
-            logger.info({ namespace, message: `Added user to [${list.name}] email list (${list.id})` })
+            logger.log({ level: 'info', namespace, message: `Added user to [${list.name}] email list (${list.id})` })
             resolve(`Added ${email} to [${list.name}] email list`)
         }, function (error) {
             logger.error({ namespace, message: error })
@@ -85,7 +85,7 @@ async function sendAlert(contacts, alert, callback) {
     config.NODE_ENV === 'production'
         ? sparky.transmissions.send(options)
             .then(data => {
-                logger.info({ namespace, message: 'Woohoo! You just sent your first mailing!' })
+                logger.log({ level: 'info', namespace, message: 'Woohoo! You just sent your first mailing!' })
                 callback({
                     receipt: {
                         id: data.id,
@@ -97,11 +97,11 @@ async function sendAlert(contacts, alert, callback) {
                 })
             })
             .catch(err => {
-                logger.info({ namespace, message: err })
+                logger.log({ level: 'info', namespace, message: err })
                 callback()
             })
         : (() => {
-            logger.info({ namespace, message: `sparky.transmissions.send(${JSON.stringify(options)})` })
+            logger.log({ level: 'info', namespace, message: `sparky.transmissions.send(${JSON.stringify(options)})` })
             callback({
                 receipt: {
                     id: `[(id) only generated in production]`,
@@ -126,13 +126,13 @@ async function sendOptIn(receipient, from, code) {
     config.NODE_ENV === 'production'
         ? sparky.transmissions.send(options)
             .then(data => {
-                logger.info({ namespace, message: 'Woohoo! You just sent your first mailing!' })
+                logger.log({ level: 'info', namespace, message: 'Woohoo! You just sent your first mailing!' })
             })
             .catch(err => {
-                logger.info({ namespace, message: err })
+                logger.log({ level: 'info', namespace, message: err })
             })
         : (() => {
-            logger.info({ namespace, message: `sparky.transmissions.send(${JSON.stringify(options)})` })
+            logger.log({ level: 'info', namespace, message: `sparky.transmissions.send(${JSON.stringify(options)})` })
         })()
 }
 if (config.NODE_ENV !== 'production') {

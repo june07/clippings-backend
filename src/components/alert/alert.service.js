@@ -90,7 +90,7 @@ async function sendAlerts() {
                             await p1
                         }
 
-                        logger.info({ namespace, message: `sent alert ${sentAlert._id}` })
+                        logger.log({ level: 'info', namespace, message: `sent alert ${sentAlert._id}` })
                     })
                     // Release the lock when done
                     client.del(lockKey, (delErr) => {
