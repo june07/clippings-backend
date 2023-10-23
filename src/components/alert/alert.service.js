@@ -50,7 +50,7 @@ async function deleteAlert(_id) {
     }
 }
 async function cacheAlerts(timeRangeMs = 0) {
-    const alerts = await AlertModel.find({ sendAt: { $gte: Date.now() - timeRangeMs } }, { '__v': 0 }, { lean: true })
+    const alerts = await AlertModel.find({ sendAt: { $lte: Date.now() + timeRangeMs } }, { '__v': 0 }, { lean: true })
         .populate({
             path: 'to',
             select: { '__v': 0 }
