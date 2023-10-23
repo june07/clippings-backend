@@ -12,7 +12,6 @@ async function createContact(ownerContactId, name, email, phone, relationship) {
     const lean = contact.toObject({ getters: true, virtuals: true })
     delete lean.__v
 
-    
     mailService.sendOptIn({ name: lean.relationship, address: lean.email }, lean.owner.name, contact.code)
 
 return lean
@@ -23,8 +22,18 @@ async function readContacts(ownerId) {
 }
 async function updateContact(_id, ownerId, name, email, phone, relationship) {
     const contactObj = { _id, owner: ownerId, name, email, phone, relationship }
-    const contact = await ContactModel.findOneAndUpdate({ _id }, contactObj, { lean: true, new: true, upsert: true })
-    return { ...contact, _id: contact._id.toString() }
+    let contact = await ContactModel.findOneAndUpdate({ _id }, contactObj, { lean: true, upsert: true })
+
+    if (contactObj.email !== contact.email) {
+        const { nanoid } = await import('nanoid')
+        const code = nanoid()
+        contact = await ContactModel.findOneAndUpdate({ _id }, { optedIn: false, code }, { lean: true, new: true, upsert: true })
+        mailService.sendOptIn({ name: contact.relationship, address: contact.email }, contact.owner.name, code)
+        return { ...contact, _id: contact._id.toString() }
+    }
+    
+    // need to return the contactObj not the contact since the contact is pre-update needed to compare email values
+    return { ...contactObj, _id: contact._id.toString() }
 }
 async function deleteContact(_id) {
     await ContactModel.findByIdAndDelete(_id)
