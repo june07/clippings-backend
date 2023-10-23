@@ -66,7 +66,7 @@ async function sendAlerts() {
 
     if (!alertsJSON) return
     const alerts = JSON.parse(alertsJSON)
-    const alertsToSend = alerts.filter(alert => Date.parse(alert.sendAt) <= Date.now() && !alerts.receipt)
+    const alertsToSend = alerts.filter(alert => Date.parse(alert.sendAt) <= Date.now() && !alert.receipt)
 
     alertsToSend.map(alert => {
         const contactsToEmail = alert.to.filter(contact => contact.optedIn && contact.email)

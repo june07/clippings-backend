@@ -22,7 +22,7 @@ const transactEmailCron = new CronJob(
     'America/Los_Angeles'
 )
 const cacheAlertsCron = new CronJob(
-    '0 0 * * * *',
+    config.NODE_ENV === 'production' ? '0 0 * * * *' : '0 * * * * *',
     async () => {
         await alertService.cacheAlerts(3_600_000)        
     },
