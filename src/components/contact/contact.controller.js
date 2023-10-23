@@ -1,29 +1,26 @@
 const contactService = require('./contact.service')
 
 async function createContact(params, socket) {
-    const { name, email, phone, relationship } = params
-    const owner = socket.sessionId
+    const { owner, name, email, phone, relationship } = params
+    const { sessionId } = socket
 
-    const contact = await contactService.createContact(owner, name, email, phone, relationship)
+    const ownerContact = await contactService.getOwnerContact(sessionId, owner)
+    const contact = await contactService.createContact(ownerContact._id, name, email, phone, relationship)
     
     socket.emit('contactCreated', contact)
 }
 async function readContacts(socket) {
-    const owner = socket.sessionId
+    const { owner } = socket
 
-    const contacts = await contactService.readContacts(owner)
+    const contacts = await contactService.readContacts(owner._id)
     
     return contacts
 }
 async function updateContact(params, socket) {
-    const { _id, owner, name, email, phone, relationship } = params
+    const { _id, name, email, phone, relationship } = params
+    const { owner } = socket
 
-    if (owner !== socket.sessionId) {
-        socket.emit(new Error(`can't update a contact owned by someone else.`))
-        return
-    }
-
-    const contact = await contactService.updateContact(_id, owner, name, email, phone, relationship)
+    const contact = await contactService.updateContact(_id, owner._id, name, email, phone, relationship)
     socket.emit('contactUpdated', contact)
 }
 async function deleteContact(params, socket) {
@@ -32,10 +29,17 @@ async function deleteContact(params, socket) {
     await contactService.deleteContact(_id)
     socket.emit('contactDeleted', { _id })
 }
+async function optIn(params, callback) {
+    const { code } = params
 
+    const contact = await contactService.optIn(code)
+    
+    callback(contact)
+}
 module.exports = {
     createContact,
     readContacts,
     updateContact,
-    deleteContact
+    deleteContact,
+    optIn,
 }

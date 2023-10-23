@@ -8,7 +8,7 @@ const { contactController, contactValidations } = require('../../components/cont
 const { messageController, messageValidations } = require('../../components/message')
 const { alertController, alertValidations } = require('../../components/alert')
 const { addContactToDailyList } = require('../../common/services/mail.service')
-const { validatePayload } = require('../../middleware')
+const { validatePayload, ownerFromSession } = require('../../middleware')
 
 const namespace = 'clippings-backend:routes:io'
 
@@ -17,14 +17,23 @@ function router(io) {
     const mainNamespace = io.of('/').on('connection', async socket => {
         const clientId = `${socket.request.headers['x-forward-for']}_${socket.sessionId}`
 
-        socket.on('getEmergencyContacts', async () => {
-            return await contactController.readContacts(socket)
+        socket.on('getEmergencyContacts', () => {
+            ownerFromSession(socket, async (error) => {
+                if (error) {
+                    logger.error(error)
+                    return error
+                } else {
+                    return await contactController.readContacts(socket)
+                }
+            })
         }).on('createContact', async (payload) => {
             validatePayload(payload, contactValidations.createContact, (error) => !error ? contactController.createContact(payload, socket) : logger.error(error))
         }).on('updateContact', async (payload) => {
             validatePayload(payload, contactValidations.updateContact, (error) => !error ? contactController.updateContact(payload, socket) : logger.error(error))
         }).on('deleteContact', async (payload) => {
             validatePayload(payload, contactValidations.deleteContact, (error) => !error ? contactController.deleteContact(payload, socket) : logger.error(error))
+        }).on('optIn', async (payload, callback) => {
+            validatePayload(payload, contactValidations.optIn, (error) => !error ? contactController.optIn(payload, callback) : logger.error(error))
         }).on('createMessage', async (payload) => {
             validatePayload(payload, messageValidations.createMessage, (error) => !error ? messageController.createMessage(payload, socket) : logger.error(error))
         }).on('getEmergencyMessages', async (payload) => {
@@ -105,9 +114,15 @@ function router(io) {
             logger.info({ namespace, message: reason })
         })
 
-        socket.emit('emergencyContact', {
-            contacts: await contactController.readContacts(socket),
-            messages: await messageController.readMessages(socket),
+
+        ownerFromSession(socket, async (error) => {
+            if (!error) {
+                socket.emit('emergencyContact', {
+                    contacts: error ? [] : await contactController.readContacts(socket),
+                    messages: error ? [] : await messageController.readMessages(socket),
+
+                })
+            }
         })
     })
 }

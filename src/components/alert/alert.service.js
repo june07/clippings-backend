@@ -69,25 +69,39 @@ async function sendAlerts() {
     const alertsToSend = alerts.filter(alert => Date.parse(alert.sendAt) <= Date.now() && !alerts.receipt)
 
     alertsToSend.map(alert => {
-        const contactsToEmail = alert.to.filter(contact => contact.email)
-        const contactsToSMS = alert.to.filter(contact => contact.phone)
+        const contactsToEmail = alert.to.filter(contact => contact.optedIn && contact.email)
+        const contactsToSMS = alert.to.filter(contact => contact.optedIn && contact.phone)
 
         if (contactsToEmail.length) {
-            mailService.sendAlert(contactsToEmail, alert, async (sentAlert) => {
-                const p1 = AlertModel.findOneAndUpdate({ _id: sentAlert._id }, sentAlert)
-                const index = alerts.findIndex(alert => alert._id === sentAlert._id)
-                
-                if (index !== -1) {
-                    alerts[index] = sentAlert
-                    await Promise.all([
-                        p1,
-                        redis.SET('alerts', JSON.stringify(alerts))
-                    ])
-                } else {
-                    await p1
-                }
+            redis.SET('mailService.sendAlert', alert._id, { NX: true, PX: 10000 }, (err, result) => {
+                if (!err && result === 'OK') {
+                    // Lock acquired; perform your critical section here
+                    mailService.sendAlert(contactsToEmail, alert, async (sentAlert) => {
+                        const p1 = AlertModel.findOneAndUpdate({ _id: sentAlert._id }, sentAlert)
+                        const index = alerts.findIndex(alert => alert._id === sentAlert._id)
 
-                logger.info({ namespace, message: `sent alert ${sentAlert._id}` })
+                        if (index !== -1) {
+                            alerts[index] = sentAlert
+                            await Promise.all([
+                                p1,
+                                redis.SET('alerts', JSON.stringify(alerts))
+                            ])
+                        } else {
+                            await p1
+                        }
+
+                        logger.info({ namespace, message: `sent alert ${sentAlert._id}` })
+                    })
+                    // Release the lock when done
+                    client.del(lockKey, (delErr) => {
+                        if (delErr) {
+                            console.error('Error releasing lock:', delErr)
+                        }
+                    })
+                } else {
+                    // Lock not acquired; someone else holds the lock
+                    console.log('Could not acquire lock')
+                }
             })
         }
         if (contactsToSMS.length) {

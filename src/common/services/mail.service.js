@@ -59,9 +59,6 @@ async function sendTransacEmail(type, options) {
         }
     )
 }
-async function sendContactConfirmation(contact) {
-
-}
 async function sendAlert(contacts, alert, callback) {
     const archivedListing = await adService.getArchivedAd(alert.listingPid)
     const options = {
@@ -98,7 +95,7 @@ async function sendAlert(contacts, alert, callback) {
                 callback()
             })
         : (() => {
-            logger.info({ namespace, message: `sparky.transmissions.send(${JSON.stringify(options, null, '  ')})` })
+            logger.info({ namespace, message: `sparky.transmissions.send(${JSON.stringify(options)})` })
             callback({
                 receipt: {
                     id: `[(id) only generated in production]`,
@@ -108,13 +105,40 @@ async function sendAlert(contacts, alert, callback) {
             })
         })()
 }
+async function sendOptIn(receipient, from, code) {
+    const options = {
+        content: {
+            from: 'noreply@june07.com',
+            subject: `Emergency Contact Designation: Please Confirm`,
+            html: `<html><body>
+    <p>${from} has added you as an emergency contact.</p>
+    
+    <p>Please click the Confirm link below so we know that it's okay to contact you on behalf of ${from} in case of an emergency.</p>
+    
+    <a href="https://clippings.june07.com/contact-confirmation/${code}">Confirm</a>
+</body></html>`
+        },
+        recipients: [receipient]
+    }
 
+    config.NODE_ENV === 'production'
+        ? sparky.transmissions.send(options)
+            .then(data => {
+                logger.info({ namespace, message: 'Woohoo! You just sent your first mailing!' })
+            })
+            .catch(err => {
+                logger.info({ namespace, message: err })
+            })
+        : (() => {
+            logger.info({ namespace, message: `sparky.transmissions.send(${JSON.stringify(options)})` })
+        })()
+}
 if (config.NODE_ENV !== 'production') {
     global.sendTransacEmail = sendTransacEmail
 }
 module.exports = {
     addContactToDailyList,
     sendTransacEmail,
-    sendContactConfirmation,
-    sendAlert
+    sendAlert,
+    sendOptIn
 }
