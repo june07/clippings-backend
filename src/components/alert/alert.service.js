@@ -93,7 +93,7 @@ async function sendAlerts() {
                     logger.log({ level: 'info', namespace, message: `sent alert ${sentAlert._id}` })
                 })
                 // Release the lock when done
-                await redis.del(alert._id, (delErr) => {
+                redis.DEL(alert._id, (delErr) => {
                     if (delErr) {
                         logger.log({ level: 'error', namespace, message: 'Error releasing lock:', delErr })
                     }
