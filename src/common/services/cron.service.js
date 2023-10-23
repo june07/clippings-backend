@@ -36,17 +36,19 @@ const cacheAlertsCron = new CronJob(
 )
 const sendAlertsCron = new CronJob(
     '0 * * * * *',
-    (onComplete) => {
+    () => {
         alertService.sendAlerts()
-        onComplete()
     },
-    () => logger.log({ level: 'info', namespace, message: 'completed sendAlertsCron cron job' }),
+    undefined,
     true,
     'America/Los_Angeles'
 )
 
 global.cacheAlerts = alertService.cacheAlerts
 global.transactEmailCronFunc = transactEmailCronFunc
+
+// call on startup
+alertService.cacheAlerts(3_600_000)
 
 transactEmailCron.start()
 cacheAlertsCron.start()
