@@ -14,7 +14,7 @@ async function createContact(ownerContactId, name, email, phone, relationship) {
 
     mailService.sendOptIn({ name: lean.relationship, address: lean.email }, lean.owner.name, contact.code)
 
-return lean
+    return lean
 }
 async function readContacts(ownerId) {
     const contacts = await ContactModel.find({ owner: ownerId }, { '__v': 0, 'code': 0 }, { lean: true })
@@ -23,11 +23,11 @@ async function readContacts(ownerId) {
 async function updateContact(_id, ownerId, name, email, phone, relationship) {
     const contactObj = { _id, owner: ownerId, name, email, phone, relationship }
     let contact = await ContactModel.findOneAndUpdate({ _id }, contactObj, { lean: true, upsert: true })
-    await contact.populate({
-        path: 'owner',
-        select: { '__v': 0 }
-    })
-    
+        .populate({
+            path: 'owner',
+            select: { '__v': 0 }
+        })
+
     if (contactObj.email !== contact.email) {
         const { nanoid } = await import('nanoid')
         const code = nanoid()
@@ -35,7 +35,7 @@ async function updateContact(_id, ownerId, name, email, phone, relationship) {
         mailService.sendOptIn({ name: contact.relationship, address: contact.email }, contact.owner.name, code)
         return { ...contact, _id: contact._id.toString() }
     }
-    
+
     // need to return the contactObj not the contact since the contact is pre-update needed to compare email values
     return { ...contactObj, _id: contact._id.toString() }
 }
