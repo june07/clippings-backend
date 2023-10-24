@@ -14,6 +14,9 @@ class CrawlerWorker extends EventEmitter {
     constructor() {
         super()
         this.emitter = new EventEmitter()
+        this.emitter.on('error', error => {
+            addSetItem('errors', JSON.stringify(error), 500)
+        })
         this.emitter.on('crawled', async payload => {
             const { listingURL, html, imageUrls, listingPid } = payload
 
@@ -122,7 +125,22 @@ async function launchCrawler(emitter, clientId) {
         requestHandlerTimeoutSecs: 60,
         maxRequestRetries: 1,
         // Use the requestHandler to process each of the crawled pages.
-        requestHandler: async ({ request, page, log }) => {
+        requestHandler: async ({ request, response, page, log }) => {
+            if (!response.ok()) {
+                emitter.emit('error', new Error(response.statusText(), {
+                    cause: {
+                        request: {
+                            url: request.url
+                        },
+                        response: {
+                            status: response.status()
+                        }
+                    }
+                }))
+                await page.close()
+                return
+            }
+
             const { options } = request.userData
             log.info(`Archiving ${request.url}...`)
 

@@ -83,6 +83,10 @@ function router(io) {
                 const mostRecentListings = await redis.SMEMBERS('recent_listings')
                 mainNamespace.emit('mostRecentListings', mostRecentListings)
             })
+            emitter.on('error', error => {
+                delete error.cause
+                socket.emit('error', error.message)
+            })
         }).on('getMostRecentListings', async (callback) => {
             const mostRecentListings = await redis.SMEMBERS('recent_listings')
             callback(mostRecentListings)
