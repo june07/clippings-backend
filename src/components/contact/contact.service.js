@@ -23,7 +23,11 @@ async function readContacts(ownerId) {
 async function updateContact(_id, ownerId, name, email, phone, relationship) {
     const contactObj = { _id, owner: ownerId, name, email, phone, relationship }
     let contact = await ContactModel.findOneAndUpdate({ _id }, contactObj, { lean: true, upsert: true })
-
+    await contact.populate({
+        path: 'owner',
+        select: { '__v': 0 }
+    })
+    
     if (contactObj.email !== contact.email) {
         const { nanoid } = await import('nanoid')
         const code = nanoid()
