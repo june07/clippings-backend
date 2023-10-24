@@ -74,30 +74,32 @@ async function sendAlerts() {
 
         if (contactsToEmail.length) {
             try {
-                await redis.SET('mailService.sendAlert', alert._id, { NX: true, PX: 10000 })
-                // Lock acquired; perform your critical section here
-                mailService.sendAlert(contactsToEmail, alert, async (sentAlert) => {
-                    const p1 = AlertModel.findOneAndUpdate({ _id: sentAlert._id }, sentAlert)
-                    const index = alerts.findIndex(alert => alert._id === sentAlert._id)
+                const lock = await redis.SET('mailService.sendAlert', alert._id, { NX: true, PX: 10000 })
+                if (lock) {
+                    // Lock acquired; perform your critical section here
+                    mailService.sendAlert(contactsToEmail, alert, async (sentAlert) => {
+                        const p1 = AlertModel.findOneAndUpdate({ _id: sentAlert._id }, sentAlert)
+                        const index = alerts.findIndex(alert => alert._id === sentAlert._id)
 
-                    if (index !== -1) {
-                        alerts[index] = sentAlert
-                        await Promise.all([
-                            p1,
-                            redis.SET('alerts', JSON.stringify(alerts))
-                        ])
-                    } else {
-                        await p1
-                    }
+                        if (index !== -1) {
+                            alerts[index] = sentAlert
+                            await Promise.all([
+                                p1,
+                                redis.SET('alerts', JSON.stringify(alerts))
+                            ])
+                        } else {
+                            await p1
+                        }
 
-                    logger.log({ level: 'info', namespace, message: `sent alert ${sentAlert._id}` })
-                })
-                // Release the lock when done
-                redis.DEL(alert._id, (delErr) => {
-                    if (delErr) {
-                        logger.log({ level: 'error', namespace, message: 'Error releasing lock:', delErr })
-                    }
-                })
+                        logger.log({ level: 'info', namespace, message: `sent alert ${sentAlert._id}` })
+                    })
+                    // Release the lock when done
+                    redis.DEL(alert._id, (delErr) => {
+                        if (delErr) {
+                            logger.log({ level: 'error', namespace, message: 'Error releasing lock:', delErr })
+                        }
+                    })
+                }
             } catch (error) {
                 // Lock not acquired; someone else holds the lock
                 logger.log({ level: 'error', namespace, message: 'Could not acquire lock' })
