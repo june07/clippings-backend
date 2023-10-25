@@ -94,10 +94,14 @@ function router(io) {
             const { last } = options
 
             const commentData = await githubService.getCommentData({ last })
-            const archiveData = await redis.HMGET('archives', commentData.map(discussion => discussion.title))
+            const pids = commentData.map(discussion => discussion.title)
+            const archiveData = (await redis.HMGET('archives', pids)).filter(archive => archive)
+            if (archiveData.length < last) {
+                (await redis.HMGET('archives-older', pids)).filter(archive => archive).map(archive => archiveData.push(archive))
+            }
             const data = commentData.map((discussion, index) => {
-                if (archiveData[index] && JSON.parse(archiveData[index])?.url) {
-                    return { ...discussion, url: JSON.parse(archiveData[index]).url }
+                if (archiveData[index] && JSON.parse(archiveData[index])?.listingURL) {
+                    return { ...discussion, url: JSON.parse(archiveData[index]).listingURL }
                 } else {
                     return discussion
                 }
