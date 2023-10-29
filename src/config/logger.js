@@ -1,13 +1,13 @@
 const winston = require('winston')
-var { Loggly } = require('winston-loggly-bulk')
 const config = require('./config')
+const LogzioWinstonTransport = require('winston-logzio')
 
-winston.add(new Loggly({
-    token: config.LOGGLY_API_KEY,
-    subdomain: config.LOGGLY_SUBDOMAIN,
-    tags: ["Winston-NodeJS"],
-    json: true
-}))
+const logzioWinstonTransport = new LogzioWinstonTransport({
+    level: 'info',
+    name: 'winston_logzio',
+    token: config.LOGZIO_TOKEN,
+    host: 'listener.logz.io',
+})
 
 const enumerateErrorFormat = winston.format((info) => {
     if (info instanceof Error) {
@@ -27,7 +27,7 @@ const logger = winston.createLogger({
     transports: [
         new winston.transports.Console({
             stderrLevels: ['info', 'error'],
-        }),
+        })
     ],
 })
 
@@ -43,6 +43,8 @@ if (config.NODE_ENV !== 'production') {
         debug.disable(info.namespace)
     })
     logger.transports.push(debugTransport)
+} else {
+    logger.transports.push(logzioWinstonTransport)
 }
 
 module.exports = logger

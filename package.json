@@ -40,7 +40,6 @@
         "mongoose": "^7.6.2",
         "morgan": "^1.10.0",
         "nanoid": "^5.0.2",
-        "node-loggly-bulk": "^4.0.1",
         "playwright": "^1.38.1",
         "redis": "^4.6.5",
         "socket.io": "^4.6.1",
@@ -49,7 +48,7 @@
         "uuid": "^9.0.0",
         "web-push": "^3.5.0",
         "winston": "^3.8.2",
-        "winston-loggly-bulk": "^3.2.1",
+        "winston-logzio": "^5.1.8",
         "xss-clean": "^0.1.1"
     },
     "devDependencies": {
