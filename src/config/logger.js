@@ -6,7 +6,8 @@ const logzioWinstonTransport = new LogzioWinstonTransport({
     level: 'info',
     name: 'winston_logzio',
     token: config.LOGZIO_TOKEN,
-    host: 'listener.logz.io',
+    host: 'listener-wa.logz.io',
+    debug: true
 })
 
 const enumerateErrorFormat = winston.format((info) => {
