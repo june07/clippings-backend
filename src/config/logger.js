@@ -6,7 +6,7 @@ const logzioWinstonTransport = new LogzioWinstonTransport({
     level: 'info',
     name: 'winston_logzio',
     token: config.LOGZIO_TOKEN,
-    host: 'listener-wa.logz.io',
+    host: 'listener.logz.io',
     debug: true
 })
 
@@ -25,11 +25,16 @@ const logger = winston.createLogger({
         winston.format.splat(),
         winston.format.printf(({ level, message }) => `${level}: ${message}`)
     ),
-    transports: [
+    transports: config.NODE_ENV === 'production' ? [
+        logzioWinstonTransport,
         new winston.transports.Console({
             stderrLevels: ['info', 'error'],
         })
-    ],
+    ] : [
+        new winston.transports.Console({
+            stderrLevels: ['info', 'error'],
+        })
+    ]
 })
 
 if (config.NODE_ENV !== 'production') {
@@ -44,8 +49,6 @@ if (config.NODE_ENV !== 'production') {
         debug.disable(info.namespace)
     })
     logger.transports.push(debugTransport)
-} else {
-    logger.transports.push(logzioWinstonTransport)
 }
 
 module.exports = logger
