@@ -32,47 +32,47 @@ async function addContactToDailyList(email) {
     })
 }
 async function sendTransacEmail(type, options) {
-    try {
-        await redis.SET('mailService.sendTransacEmail', options.id, { NX: true, PX: 10000 })
-        let p
+    const lock = await redis.SET('mailService.sendTransacEmail', options.id, { NX: true, PX: 10000 })
+    let p
 
-        if (type === 'daily') {
-            const nonBlacklistedEmailAddresses = (await contactsApiInstance.getContactsFromList(14))?.contacts?.filter(contact => !contact.emailBlacklisted)
-            let sendSmtpEmail = new Brevo.SendSmtpEmail()
-
-            sendSmtpEmail = {
-                bcc: config.NODE_ENV === 'production' ? nonBlacklistedEmailAddresses : [{ email: config.TEST_EMAIL_RECIPIENT }],
-                templateId: 16,
-                params: {
-                    ads: options.ads,
-                    date: new Date().toLocaleDateString()
-                },
-            }
-            p = transactionalEmailApiInstance.sendTransacEmail(sendSmtpEmail)
-        }
-
-        // Release the lock when done
-        await new Promise(resolve => {
-            redis.DEL(options.id, (delErr) => {
-                if (delErr) {
-                    logger.log({ level: 'error', namespace, message: 'Error releasing lock:', delErr })
-                }
-                resolve()
-            })
-        })
-
-        return p.then(
-            function (data) {
-                logger.info('API called successfully. Returned data: ', data)
-            },
-            function (error) {
-                logger.error(error)
-            }
-        )
-    } catch (error) {
-        // Lock not acquired; someone else holds the lock
+    if (!lock) {
         logger.log({ level: 'error', namespace, message: 'Could not acquire lock' })
+        return
     }
+
+    if (type === 'daily') {
+        const nonBlacklistedEmailAddresses = (await contactsApiInstance.getContactsFromList(14))?.contacts?.filter(contact => !contact.emailBlacklisted)
+        let sendSmtpEmail = new Brevo.SendSmtpEmail()
+
+        sendSmtpEmail = {
+            bcc: config.NODE_ENV === 'production' ? nonBlacklistedEmailAddresses : [{ email: config.TEST_EMAIL_RECIPIENT }],
+            templateId: 16,
+            params: {
+                ads: options.ads,
+                date: new Date().toLocaleDateString()
+            },
+        }
+        p = transactionalEmailApiInstance.sendTransacEmail(sendSmtpEmail)
+    }
+
+    // Release the lock when done
+    await new Promise(resolve => {
+        redis.DEL(options.id, (delErr) => {
+            if (delErr) {
+                logger.log({ level: 'error', namespace, message: 'Error releasing lock:', delErr })
+            }
+            resolve()
+        })
+    })
+
+    return p.then(
+        function (data) {
+            logger.info('API called successfully. Returned data: ', data)
+        },
+        function (error) {
+            logger.error(error)
+        }
+    )
 }
 function providerPathFromURL(url) {
     if (/craigslist.org/i.test(url)) {
