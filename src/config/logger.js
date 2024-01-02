@@ -1,14 +1,5 @@
 const winston = require('winston')
 const config = require('./config')
-const LogzioWinstonTransport = require('winston-logzio')
-
-const logzioWinstonTransport = new LogzioWinstonTransport({
-    level: 'info',
-    name: 'winston_logzio',
-    token: config.LOGZIO_TOKEN,
-    host: 'listener.logz.io',
-    debug: true
-})
 
 const enumerateErrorFormat = winston.format((info) => {
     if (info instanceof Error) {
@@ -25,12 +16,7 @@ const logger = winston.createLogger({
         winston.format.splat(),
         winston.format.printf(({ level, message }) => `${level}: ${message}`)
     ),
-    transports: config.NODE_ENV === 'production' ? [
-        logzioWinstonTransport,
-        new winston.transports.Console({
-            stderrLevels: ['info', 'error'],
-        })
-    ] : [
+    transports: [
         new winston.transports.Console({
             stderrLevels: ['info', 'error'],
         })

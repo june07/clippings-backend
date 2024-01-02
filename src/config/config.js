@@ -18,7 +18,6 @@ const envVarsSchema = Joi.object()
         WEBPUSH_PUBLIC_KEY: Joi.string().required(),
         WEBPUSH_PRIVATE_KEY: Joi.string().required(),
         WEBPUSH_EMAIL: Joi.string().email().required(),
-        LOGZIO_TOKEN: Joi.string().required(),
         SPARKPOST_API_KEY: Joi.string().required()
     })
     .unknown();
