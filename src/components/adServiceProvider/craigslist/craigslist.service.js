@@ -3,7 +3,7 @@ const CraigslistListing = require('./craigslistListing.model')
 
 const namespace = 'clippings-backend:craigslist:service'
 
-async function transferData() {
+async function transferDataOLD() {
     const today = new Date()
     const yesterday = new Date(new Date().setDate(today.getDate() - 1))
 
@@ -49,6 +49,71 @@ async function transferData() {
         logger.error({ namespace, message: 'Error transferring data:', error })
     }
 }
+async function transferData() {
+    const today = new Date()
+    const yesterday = new Date(new Date().setDate(today.getDate() - 1))
+    const yesterdayEnd = new Date(yesterday.setHours(23, 59, 59, 999))
+    const savedArchives = []
+    const batchSize = 100 // Tune this based on memory/performance
+    let cursor = '0'
+
+    try {
+        do {
+            const { cursor: nextCursor, keys: results } = await redis.HSCAN('archives', cursor, 'COUNT', batchSize)
+
+            cursor = nextCursor
+
+            for (let i = 0; i < results.length; i += 2) {
+                const listingPid = results[i]
+                const archiveStr = results[i + 1]
+
+                try {
+                    const archiveObj = JSON.parse(archiveStr)
+                    const createdAt = archiveObj?.createdAt
+
+                    if (!isNaN(createdAt)) {
+                        const createdAtDate = new Date(createdAt)
+
+                        if (createdAtDate <= yesterdayEnd) {
+                            // Save to MongoDB
+                            await CraigslistListing.findOneAndUpdate(
+                                { listingPid },
+                                { listingPid, json: archiveStr },
+                                { upsert: true, new: true, lean: true }
+                            )
+
+                            savedArchives.push(archiveObj)
+
+                            // Move to older hash
+                            const multi = redis.multi()
+
+                            multi.HSET('archives-older', listingPid, archiveStr)
+                            multi.HDEL('archives', listingPid)
+                            
+                            await multi.exec()
+
+                            console.log(`Saved and moved listing: ${listingPid}`)
+                        }
+                    }
+                } catch (innerErr) {
+                    logger.warn({ namespace, message: `Error processing archive ${results[i]}:`, error: innerErr })
+                }
+            }
+        } while (cursor !== '0')
+
+        if (!savedArchives.length) {
+            logger.info({ namespace, message: 'No archives to transfer for yesterday.' })
+            return []
+        }
+
+        return savedArchives.map(archive => ({
+            ...archive,
+            url: `https://clippings.june07.com/archive/cl/${archive.listingPid}`
+        }))
+    } catch (error) {
+        logger.error({ namespace, message: 'Error transferring data:', error })
+    }
+}
 function filterYesterdays(listings) {
     const today = new Date()
     const yesterday = new Date(new Date().setDate(today.getDate() - 1))
@@ -56,13 +121,13 @@ function filterYesterdays(listings) {
     const yesterdayStart = yesterday.setHours(0, 0, 0, 0)
     const yesterdayEnd = yesterday.setHours(23, 59, 59, 999)
 
-    return listings.filter(listing => {
+    return listings?.filter(listing => {
         createdAtDate = new Date(listing.createdAt)
 
         if (createdAtDate >= yesterdayStart && createdAtDate < yesterdayEnd) {
             return listing
         }
-    })
+    }) || []
 }
 
 if (config.NODE_ENV !== 'production') {

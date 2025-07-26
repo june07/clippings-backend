@@ -13,6 +13,8 @@ const transactEmailCronFunc = async (onComplete) => {
 
     if (ads.length) {
         const id = `daily-${new Date().toLocaleDateString()}`
+
+        logger.log({ level: 'info', namespace, message: `Sending daily email for ${id} with ${ads.length} ads` })
         mailService.sendTransacEmail('daily', { id, ads })
     }
     onComplete()
