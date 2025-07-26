@@ -1,8 +1,6 @@
-version: '3'
-
 services:
   node-app:
-    container_name: node-june07-dev
+    container_name: node-june07-dev-clippings
     command: npm run dev
     user: root
     ports:

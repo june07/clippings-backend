@@ -2,7 +2,7 @@ const mongoose = require('mongoose')
 
 // Define the Mongoose schema for Craigslist listings
 const craigslistListingSchema = new mongoose.Schema({
-    listingPid: { type: Number, unique: true },
+    listingPid: { type: Number },
     json: String
 }).index({ listingPid: 1 })
 

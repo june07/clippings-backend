@@ -34,6 +34,10 @@ const errorHandler = (err, req, res, next) => {
         logger.error(err)
     }
 
+    if (!statusCode) {
+        res.send(response)
+        return
+    }
     res.status(statusCode).send(response)
 }
 

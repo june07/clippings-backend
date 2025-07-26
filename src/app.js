@@ -81,7 +81,7 @@ app.use(
         exposedHeaders: ['set-cookie'],
     })
 )
-app.options('*', cors())
+app.options('{*splat}', cors())
 app.head('/health', (_req, res) => res.send('ok'))
 app.use(session({
     secret: config.EXPRESS_SESSION_SECRET,

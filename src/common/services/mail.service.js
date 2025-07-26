@@ -5,10 +5,10 @@ const { config, logger, redis } = require('../../config')
 const { adService } = require('../../components/ad')
 
 const namespace = 'clippings-backend:mail:service'
-const defaultClient = Brevo.ApiClient.instance
-let apiKey = defaultClient.authentications['api-key']
-apiKey.apiKey = config.SENDINBLUE_API_KEY
+
 const transactionalEmailApiInstance = new Brevo.TransactionalEmailsApi()
+transactionalEmailApiInstance.authentications['apiKey'].apiKey = config.SENDINBLUE_API_KEY
+
 const contactsApiInstance = new Brevo.ContactsApi()
 const sparky = new SparkPost(config.SPARKPOST_API_KEY)
 
