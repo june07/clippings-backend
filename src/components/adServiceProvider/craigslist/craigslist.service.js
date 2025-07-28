@@ -59,7 +59,7 @@ async function transferData() {
 
     try {
         do {
-            const { cursor: nextCursor, keys: results } = await redis.HSCAN('archives', cursor, 'COUNT', batchSize)
+            const [nextCursor, results] = await redis.HSCAN('archives', cursor, { COUNT: batchSize })
 
             cursor = nextCursor
 
@@ -89,7 +89,7 @@ async function transferData() {
 
                             multi.HSET('archives-older', listingPid, archiveStr)
                             multi.HDEL('archives', listingPid)
-                            
+
                             await multi.exec()
 
                             console.log(`Saved and moved listing: ${listingPid}`)
