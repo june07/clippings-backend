@@ -50,7 +50,7 @@ async function sendTransacEmail(type, options) {
     try {
         if (type === 'daily') {
             const allContacts = await contactsApiInstance.getContactsFromList(14)
-            const nonBlacklisted = allContacts?.contacts?.filter(contact => !contact.emailBlacklisted) || []
+            const nonBlacklisted = allContacts.body.contacts?.filter(contact => !contact.emailBlacklisted) || []
 
             const sendSmtpEmail = new brevo.SendSmtpEmail()
             const emailPayload = {
