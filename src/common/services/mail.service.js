@@ -52,7 +52,7 @@ async function sendTransacEmail(type, options) {
             const allContacts = await contactsApiInstance.getContactsFromList(14)
             const nonBlacklisted = allContacts.body.contacts?.filter(contact => !contact.emailBlacklisted) || []
 
-            const sendSmtpEmail = new brevo.SendSmtpEmail()
+            const sendSmtpEmail = new Brevo.SendSmtpEmail()
             const emailPayload = {
                 bcc: config.NODE_ENV === 'production'
                     ? nonBlacklisted
