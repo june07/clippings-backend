@@ -7,9 +7,10 @@ const { adService } = require('../../components/ad')
 const namespace = 'clippings-backend:mail:service'
 
 const transactionalEmailApiInstance = new Brevo.TransactionalEmailsApi()
-transactionalEmailApiInstance.authentications['apiKey'].apiKey = config.SENDINBLUE_API_KEY
-
 const contactsApiInstance = new Brevo.ContactsApi()
+transactionalEmailApiInstance.authentications['apiKey'].apiKey = config.SENDINBLUE_API_KEY
+contactsApiInstance.authentications['apiKey'].apiKey = config.SENDINBLUE_API_KEY
+
 const sparky = new SparkPost(config.SPARKPOST_API_KEY)
 
 async function addContactToDailyList(email) {
