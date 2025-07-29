@@ -32,48 +32,87 @@ async function addContactToDailyList(email) {
     })
 }
 async function sendTransacEmail(type, options) {
-    const lock = await redis.SET('mailService.sendTransacEmail', options.id, { NX: true, PX: 10000 })
-    let p
+    const lockKey = 'mailService.sendTransacEmail'
+    const lock = await redis.SET(lockKey, options.id, { NX: true, PX: 10000 })
 
     if (!lock) {
-        logger.log({ level: 'error', namespace, message: 'Could not acquire lock' })
+        logger.error({
+            namespace,
+            message: 'Could not acquire lock',
+            meta: { type, id: options.id }
+        })
         return
     }
 
-    if (type === 'daily') {
-        const nonBlacklistedEmailAddresses = (await contactsApiInstance.getContactsFromList(14))?.contacts?.filter(contact => !contact.emailBlacklisted)
-        let sendSmtpEmail = new Brevo.SendSmtpEmail()
+    let p
 
-        sendSmtpEmail = {
-            bcc: config.NODE_ENV === 'production' ? nonBlacklistedEmailAddresses : [{ email: config.TEST_EMAIL_RECIPIENT }],
-            templateId: 16,
-            params: {
-                ads: options.ads,
-                date: new Date().toLocaleDateString()
-            },
+    try {
+        if (type === 'daily') {
+            const allContacts = await contactsApiInstance.getContactsFromList(14)
+            const nonBlacklisted = allContacts?.contacts?.filter(contact => !contact.emailBlacklisted) || []
+
+            const sendSmtpEmail = new Brevo.SendSmtpEmail({
+                bcc: config.NODE_ENV === 'production'
+                    ? nonBlacklisted
+                    : [{ email: config.TEST_EMAIL_RECIPIENT }],
+                templateId: 16,
+                params: {
+                    ads: options.ads,
+                    date: new Date().toLocaleDateString()
+                },
+            })
+
+            logger.info({
+                namespace,
+                message: 'Sending transactional email',
+                meta: {
+                    type,
+                    recipientCount: sendSmtpEmail.bcc.length,
+                    templateId: sendSmtpEmail.templateId,
+                    testMode: config.NODE_ENV !== 'production'
+                }
+            })
+
+            p = await transactionalEmailApiInstance.sendTransacEmail(sendSmtpEmail)
+
+            logger.info({
+                namespace,
+                message: 'Transactional email sent successfully',
+                meta: { type, id: options.id, response: p }
+            })
+
+        } else {
+            logger.warn({
+                namespace,
+                message: `Unhandled email type: ${type}`,
+                meta: { id: options.id }
+            })
         }
-        p = transactionalEmailApiInstance.sendTransacEmail(sendSmtpEmail)
+    } catch (error) {
+        logger.error({
+            namespace,
+            message: 'Error sending transactional email',
+            meta: {
+                type,
+                id: options.id,
+                error: error?.response?.body || error.message || error
+            }
+        })
+    } finally {
+        try {
+            await redis.DEL(lockKey)
+        } catch (delErr) {
+            logger.error({
+                namespace,
+                message: 'Failed to release Redis lock',
+                meta: { id: options.id, error: delErr }
+            })
+        }
     }
 
-    // Release the lock when done
-    await new Promise(resolve => {
-        redis.DEL(options.id, (delErr) => {
-            if (delErr) {
-                logger.log({ level: 'error', namespace, message: 'Error releasing lock:', delErr })
-            }
-            resolve()
-        })
-    })
-
-    return p.then(
-        function (data) {
-            logger.info('API called successfully. Returned data: ', data)
-        },
-        function (error) {
-            logger.error(error)
-        }
-    )
+    return p
 }
+
 function providerPathFromURL(url) {
     if (/craigslist.org/i.test(url)) {
         return 'cl'
