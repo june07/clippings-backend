@@ -64,8 +64,7 @@ async function transferData() {
             cursor = nextCursor
 
             for (let i = 0; i < results.length; i += 2) {
-                const listingPid = results[i]
-                const archiveStr = results[i + 1]
+                const [listingPid, archiveStr] = results[i + 1]
 
                 try {
                     const archiveObj = JSON.parse(archiveStr)
