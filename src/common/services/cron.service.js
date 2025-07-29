@@ -20,7 +20,7 @@ const transactEmailCronFunc = async (onComplete) => {
     onComplete()
 }
 const transactEmailCron = new CronJob(
-    '0 0 * * * *',
+    '0 0 0 * * *',
     transactEmailCronFunc,
     () => logger.log({ level: 'info', namespace, message: 'completed transactEmailCron cron job' }),
     true,
