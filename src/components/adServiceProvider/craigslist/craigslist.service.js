@@ -60,7 +60,7 @@ async function transferData() {
     try {
         do {
             const result = await redis.HSCAN('archives', cursor, { COUNT: batchSize })
-            const [nextCursor, results] = [result.cursor, result.tuples]
+            const [nextCursor, results] = [result.cursor, result.entries]
             cursor = nextCursor
 
             for (let i = 0; i < results.length; i += 2) {
