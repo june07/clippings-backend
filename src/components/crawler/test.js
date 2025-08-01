@@ -1,6 +1,7 @@
 // For more information, see https://crawlee.dev/
-import { PlaywrightCrawler, Configuration, sleep } from 'crawlee'
+import { PlaywrightCrawler, Configuration } from 'crawlee'
 import { BrowserName, DeviceCategory, OperatingSystemsName } from '@crawlee/browser-pool'
+import requestHandler from './requestHandler.js'
 
 const config = Configuration.getGlobalConfig()
 config.set('logLevel', 'DEBUG')
@@ -10,7 +11,11 @@ export default async (url) => {
 
     const crawler = new PlaywrightCrawler({
         launchContext: {
-            useIncognitoPages: true
+            useIncognitoPages: true,
+            launchOptions: {
+                headless: false,  // ⬅️ important for debugging
+                slowMo: 100,      // optional: slow down for human eye
+            }
         },
         browserPoolOptions: {
             useFingerprints: true, // this is the default
@@ -32,6 +37,7 @@ export default async (url) => {
         requestHandlerTimeoutSecs: 60,
         maxRequestRetries: 1,
         // Use the requestHandler to process each of the crawled pages.
+        /**
         async requestHandler({ request, page, log }) {
             log.info(`Processing ${request.url}...`)
             await Promise.all([
@@ -64,7 +70,12 @@ export default async (url) => {
             await page.screenshot({ path: `/tmp/screenshot.png` })
             await page.close()
         }
+            */
+        requestHandler: requestHandler({ emitter: { emit: console.log }, logger: console, namespace: 'test' }),
     })
-    await crawler.run([url])
+    await crawler.run([{
+        url,
+        userData: { options: { listingUrl: url, listingUUID: 'test', clientId: 'test' } }
+    }])
     return data
 }

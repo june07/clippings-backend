@@ -5,14 +5,14 @@ async function createMessage(params, socket) {
     const titleId = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ', 3)
 
     const { text, title = `Message ${titleId()}` } = params
-    const owner = socket.sessionId
+    const owner = socket.request.sessionId || socket.request.session.id
 
     const message = await messageService.createMessage(owner, text, title)
     
     socket.emit('messageCreated', message)
 }
 async function readMessages(socket) {
-    const owner = socket.sessionId
+    const owner = socket.request.sessionId || socket.request.session.id
 
     const messages = await messageService.readMessages(owner)
     
@@ -21,7 +21,7 @@ async function readMessages(socket) {
 async function updateMessage(params, socket) {
     const { _id, owner, text, title } = params
 
-    if (owner !== socket.sessionId) {
+    if (owner !== socket.request.sessionId || socket.request.session.id) {
         socket.emit(new Error(`can't update a message owned by someone else.`))
         return
     }

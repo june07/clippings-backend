@@ -4,6 +4,7 @@ const inspector = require('node:inspector')
 const { Server } = require('socket.io')
 const https = require('https')
 const fs = require('fs')
+const { createProxyMiddleware } = require('http-proxy-middleware')
 
 const app = require('./app')
 const logger = require('./config/logger')
@@ -34,6 +35,41 @@ const server = https.createServer({
 server.listen(config.PORT, () => {
     console.log(`listening on ${config.PORT}`)
 })
+
+// Create a map of proxy middlewares per port (optional cache)
+const proxyCache = {}
+
+function getProxy(webPort) {
+    if (!proxyCache[webPort]) {
+        proxyCache[webPort] = createProxyMiddleware({
+            target: `http://0.0.0.0:${webPort}`,
+            changeOrigin: true,
+            ws: true,
+            timeout: 0,
+            proxyTimeout: 0,
+            pathRewrite: (path) => path.replace(`/v1/vnc/${webPort}`, '/'),
+        })
+    }
+    return proxyCache[webPort]
+}
+app.use('/v1/vnc/:webPort', (req, res, next) => {
+    const { webPort } = req.params
+    if (!webPort) return res.status(400).send('Missing webPort')
+
+    const proxy = getProxy(webPort)
+    proxy(req, res, next)
+})
+server.on('upgrade', (req, socket, head) => {
+    const url = req.url || ''
+    const match = url.match(/^\/v1\/vnc\/(\d+)/)
+
+    if (match) {
+        const webPort = match[1]
+        const proxy = getProxy(webPort)
+        proxy.upgrade(req, socket, head)
+    }
+})
+
 const io = new Server(server, {
     cors: {
         credentials: true,
@@ -50,25 +86,8 @@ const io = new Server(server, {
         domain: config.COOKIE_DOMAIN
     }
 })
-io.use((socket, next) => {
-    const sessionId = socket.handshake.auth.sessionId
-    if (sessionId) {
-        // find existing session
-        app.sessionStore.get(sessionId, (error, session) => {
-            if (error) {
-                logger.error({ namespace, message: error.message || error })
-            }
-            if (session) {
-                socket.sessionId = sessionId
-                next()
-            } else {
-                next(new Error('no matching sessionId found'))
-            }
-        })
-    } else {
-        next(new Error('no sessionId provided'))
-    }
-})
+io.engine.use(app.expressSession)
+
 io.on('connection', (socket) => {
     logger.info(`Socket.io connection is established`)
 })

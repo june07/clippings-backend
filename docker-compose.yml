@@ -7,6 +7,7 @@ services:
       - DD_AGENT_HOST=datadog      
     volumes:
       - .:/usr/src/node-app
+      - /var/run/docker.sock:/var/run/docker.sock
     
     depends_on:
       - redis

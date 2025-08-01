@@ -3,7 +3,7 @@ const { Octokit } = require("@octokit/rest")
 
 const { logger } = require('../../config')
 
-const { GITHUB_USER, GITHUB_REPO, GITHUB_TOKEN, DOMAIN } = process.env
+const { NODE_ENV, GITHUB_USER, GITHUB_REPO, GITHUB_TOKEN, DOMAIN } = process.env
 const namespace = 'clippings-backend:github:service'
 
 async function downloadImage(url) {
@@ -29,7 +29,7 @@ async function saveAdToPages(options) {
     const octokit = new Octokit({
         auth: GITHUB_TOKEN,
     })
-    const subdir = `${pid}`
+    const subdir = `${NODE_ENV === 'production' ? '' : 'dev/'}${pid}`
     const indexHTMLHead = `
 <!DOCTYPE html>
 <html>

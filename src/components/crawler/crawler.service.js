@@ -18,6 +18,8 @@ const archive = async (options) => {
     return { emitter: crawlerWorker.emitter }
 }
 
+global.crawlerWorker = crawlerWorker
+
 module.exports = {
     archive
 }

@@ -1,8 +1,6 @@
 /* eslint-disable security/detect-non-literal-regexp */
 const express = require('express')
 const helmet = require('helmet')
-const xss = require('xss-clean')
-const mongoSanitize = require('express-mongo-sanitize')
 const compression = require('compression')
 const cors = require('cors')
 const session = require('express-session')
@@ -25,8 +23,6 @@ const sessionStore = MongoStore.create({
 })
 
 app.use(cookieParser())
-
-app.use(express.raw({ type: (req) => /\/v1\/webhook\/stripe/.test(req.originalUrl) }))
 app.use(express.text())
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
@@ -50,10 +46,6 @@ app.use(
         },
     })
 )
-
-// sanitize request data
-app.use(xss())
-app.use(mongoSanitize())
 
 // gzip compression
 app.use(compression())
@@ -83,7 +75,7 @@ app.use(
 )
 app.options('{*splat}', cors())
 app.head('/health', (_req, res) => res.send('ok'))
-app.use(session({
+const expressSession = session({
     secret: config.EXPRESS_SESSION_SECRET,
     store: sessionStore,
     saveUninitialized: true,
@@ -95,7 +87,9 @@ app.use(session({
         domain: config.COOKIE_DOMAIN,
         maxAge: 31536000000
     }
-}))
+})
+app.use(expressSession)
+app.expressSession = expressSession
 app.sessionStore = sessionStore
 // limit repeated failed requests to auth endpoints
 if (config.NODE_ENV === 'production') {

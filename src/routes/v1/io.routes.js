@@ -15,7 +15,7 @@ const namespace = 'clippings-backend:routes:io'
 function router(io) {
     logger.log({ level: 'info', namespace, message: 'Setting up io routes...' })
     const mainNamespace = io.of('/').on('connection', async socket => {
-        const clientId = `${socket.request.headers['x-forward-for']}_${socket.sessionId}`
+        const clientId = `${socket.request.headers['x-forward-for'] || socket.request.connection.remoteAddress}_${socket.request.sessionId || socket.request.session.id}`
 
         socket.on('getEmergencyContacts', () => {
             ownerFromSession(socket, async (error) => {
@@ -78,6 +78,7 @@ function router(io) {
             socket.craigslist = { listingPid, listingURL, listingUUID, clientId }
 
             const { emitter } = await crawlerService.archive(socket.craigslist)
+            
             emitter.on('archived', async payload => {
                 socket.emit('update', payload)
                 const mostRecentListings = await redis.SMEMBERS('recent_listings')
@@ -86,6 +87,9 @@ function router(io) {
             emitter.on('error', error => {
                 delete error.cause
                 socket.emit('error', error.message)
+            })
+            emitter.on('vncReady', payload => {
+                socket.emit('vncReady', payload)
             })
         }).on('getMostRecentListings', async (callback) => {
             const mostRecentListings = await redis.SMEMBERS('recent_listings')
