@@ -70,12 +70,12 @@ class CrawlerWorker extends EventEmitter {
             }
         })
         this.emitter.on('re-crawled', async payload => {
-            const { emailAddress, listingPid } = payload
+            const { emailAddress, clientId, listingPid } = payload
 
-            const cache = await redis.GET(`vnc:allocations-${listingPid}`) || {}
+            const cache = await redis.GET(`vnc:allocations-${clientId}`) || {}
             const { display, webPort, vncPort } = JSON.parse(cache)
 
-            cleanupX11Server({ display, webPort, vncPort, listingPid })
+            cleanupX11Server({ display, webPort, vncPort, clientId })
             deAllocateVncAndWebPorts(vncPort, webPort, display)
 
             if (emailAddress) {
@@ -84,6 +84,7 @@ class CrawlerWorker extends EventEmitter {
 
                 await redis.SADD(`emails:${today}`, JSON.stringify({ listingPid, emailAddress }))
             }
+            this.emitter.emit('vncFinished')
         })
         this.crawlers = {}
         this.testFunc = () => test()
@@ -253,7 +254,8 @@ async function launchHeadedCrawler(emitter, clientId, vncConfig) {
                         '--single-process',
                         '--disable-gpu',
                         '--disable-software-rasterizer',
-                        '--window-position=0,0'
+                        '--window-position=0,0',
+                        '--window-size=1920,1080',
                     ],
                     env: {
                         DISPLAY: `:${display}`,
@@ -280,7 +282,7 @@ async function launchHeadedCrawler(emitter, clientId, vncConfig) {
                     },
                 },
             },
-            requestHandlerTimeoutSecs: 120,
+            requestHandlerTimeoutSecs: 60 * 5,
             maxRequestRetries: 0, // no retry here – user will solve CAPTCHA
             requestHandler: requestHandler2({ emitter, logger, namespace })
         })
@@ -474,3 +476,43 @@ async function cleanupX11Server({ display, vncPort, webPort, clientId }) {
         console.error(`Error during X11 cleanup for client ${clientId}:`, err)
     }
 }
+async function cleanupX11Server({ display, vncPort, webPort, clientId }) {
+    const x11Auth = `/tmp/.Xauthority-${clientId}`
+    const x11Log = `/tmp/xvfb-${clientId}.log`
+    const x11vncLog = `/tmp/x11vnc-${clientId}.log`
+    const websockifyLog = `/tmp/websockify-${clientId}.log`
+
+    const killCmds = [
+        `pkill -f "Xvfb :${display}"`,
+        `pkill -f "x11vnc -display :${display}"`,
+        `pkill -f "websockify ${webPort} localhost:${vncPort}"`,
+    ]
+
+    for (const cmd of killCmds) {
+        try {
+            await execAsync(cmd)
+        } catch (err) {
+            if (err.code === 1) {
+                // pkill returns 1 if no processes matched
+                console.warn(`No matching process for: ${cmd}`)
+            } else {
+                console.warn(`Failed to execute: ${cmd}`, err.message)
+            }
+        }
+    }
+
+    const filesToRemove = [x11Auth, x11Log, x11vncLog, websockifyLog]
+
+    for (const file of filesToRemove) {
+        try {
+            await fs.promises.unlink(file)
+        } catch (e) {
+            if (e.code !== 'ENOENT') {
+                console.warn(`Could not remove file ${file}:`, e.message)
+            }
+        }
+    }
+
+    console.log(`Cleaned up X11 server for client ${clientId}`)
+}
+

@@ -91,6 +91,9 @@ function router(io) {
             emitter.on('vncReady', payload => {
                 socket.emit('vncReady', payload)
             })
+            emitter.on('vncFinished', () => {
+                socket.emit('vncFinished')
+            })
         }).on('getMostRecentListings', async (callback) => {
             const mostRecentListings = await redis.SMEMBERS('recent_listings')
             callback(mostRecentListings)
