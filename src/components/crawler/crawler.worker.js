@@ -459,37 +459,6 @@ async function cleanupX11Server({ display, vncPort, webPort, clientId }) {
         `pkill -f "websockify ${webPort} localhost:${vncPort}"`,
     ]
 
-    try {
-        for (const cmd of killCmds) {
-            await execAsync(cmd)
-        }
-
-        const filesToRemove = [x11Auth, x11Log, x11vncLog, websockifyLog]
-        for (const file of filesToRemove) {
-            try {
-                await fs.promises.unlink(file)
-            } catch (e) {
-                if (e.code !== 'ENOENT') console.warn(`Could not remove file ${file}:`, e.message)
-            }
-        }
-
-        console.log(`Cleaned up X11 server for client ${clientId}`)
-    } catch (err) {
-        console.error(`Error during X11 cleanup for client ${clientId}:`, err)
-    }
-}
-async function cleanupX11Server({ display, vncPort, webPort, clientId }) {
-    const x11Auth = `/tmp/.Xauthority-${clientId}`
-    const x11Log = `/tmp/xvfb-${clientId}.log`
-    const x11vncLog = `/tmp/x11vnc-${clientId}.log`
-    const websockifyLog = `/tmp/websockify-${clientId}.log`
-
-    const killCmds = [
-        `pkill -f "Xvfb :${display}"`,
-        `pkill -f "x11vnc -display :${display}"`,
-        `pkill -f "websockify ${webPort} localhost:${vncPort}"`,
-    ]
-
     for (const cmd of killCmds) {
         try {
             await execAsync(cmd)
@@ -517,4 +486,3 @@ async function cleanupX11Server({ display, vncPort, webPort, clientId }) {
 
     console.log(`Cleaned up X11 server for client ${clientId}`)
 }
-

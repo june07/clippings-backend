@@ -70,7 +70,7 @@ module.exports = ({ emitter, logger, namespace }) => async function workerReques
     try {
         log.info(`Processing reply button for ${request.url}...`)
 
-        const replyButton = await page.waitForSelector('.reply-button')
+        const replyButton = await page.waitForSelector('.reply-button', { timeout: 5000 })
 
         await replyButton.hover()
         await replyButton.click()
@@ -86,20 +86,8 @@ module.exports = ({ emitter, logger, namespace }) => async function workerReques
 
         log.info(`Processed reply button for ${request.url}...`)
     } catch (error) {
-        log.info('Might have detected a captcha...')
-        try {
-            for (const frame of page.frames()) {
-                const hcaptchaFrame = await frame.$('iframe[src*="hcaptcha.com/captcha"]')
-
-                if (hcaptchaFrame) {
-                    log.info(`Detected captcha in frame: ${frame.url()}`)
-                    detectedCaptcha = true
-                    break
-                }
-            }
-        } catch (err) {
-            log.info('No captcha iframe detected within timeout.')
-        }
+        log.info('Might have detected a captcha... failing fast to allow requestHandler2 to handle it.')
+        detectedCaptcha = true
     }
 
     log.info(JSON.stringify({ url: request.url, imageUrls: imageUrls.flat() }, null, 4))
