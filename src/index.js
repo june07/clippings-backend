@@ -42,7 +42,7 @@ const proxyCache = {}
 function getProxy(webPort) {
     if (!proxyCache[webPort]) {
         proxyCache[webPort] = createProxyMiddleware({
-            target: `http://0.0.0.0:${webPort}`,
+            target: `http://localhost:${webPort}`,
             changeOrigin: true,
             ws: true,
             timeout: 0,
