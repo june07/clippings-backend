@@ -63,12 +63,12 @@ async function sendTransacEmail(type, options) {
                     date: new Date().toLocaleDateString()
                 },
             }
-            
+
             Object.keys(emailPayload || {}).map(key => { sendSmtpEmail[key] = emailPayload[key] })
 
             logger.info({
                 namespace,
-                message: 'Sending transactional email',
+                message: `Sending 'daily' transactional email`,
                 meta: {
                     type,
                     recipientCount: sendSmtpEmail.bcc.length,
@@ -84,7 +84,53 @@ async function sendTransacEmail(type, options) {
                 message: 'Transactional email sent successfully',
                 meta: { type, id: options.id, response: p }
             })
+        } else if (type === 'featured') {
+            for (const ad of options.ads) {
+                const { email, title, listingPid } = ad
+                const redisKey = `email-sent:${listingPid}:${email}`
+                const alreadySent = await redis.GET(redisKey)
 
+                if (alreadySent) {
+                    logger.info({ namespace, message: 'Email already sent', meta: { type, id: options.id, ad } })
+                    continue
+                }
+
+                // don't need to check craigslist ephemeral emails for blacklist
+                const sendSmtpEmail = new Brevo.SendSmtpEmail()
+                const emailPayload = {
+                    bcc: config.NODE_ENV === 'production'
+                        ? [email]
+                        : [{ email: config.TEST_EMAIL_RECIPIENT }],
+                    templateId: 23,
+                    params: {
+                        adTitle: title,
+                        adUrl: `https://clippings.june07.com/archive/cl/${listingPid}`,
+                    },
+                }
+
+                Object.keys(emailPayload || {}).map(key => { sendSmtpEmail[key] = emailPayload[key] })
+
+                logger.info({
+                    namespace,
+                    message: `Sending 'featured' transactional email`,
+                    meta: {
+                        type,
+                        recipientCount: sendSmtpEmail.bcc.length,
+                        templateId: sendSmtpEmail.templateId,
+                        testMode: config.NODE_ENV !== 'production'
+                    }
+                })
+
+                p = await transactionalEmailApiInstance.sendTransacEmail(sendSmtpEmail)
+
+                logger.info({
+                    namespace,
+                    message: 'Transactional email sent successfully',
+                    meta: { type, id: options.id, response: p }
+                })
+
+                await redis.SET(redisKey, '1', { EX: 86400 })
+            }
         } else {
             logger.warn({
                 namespace,
