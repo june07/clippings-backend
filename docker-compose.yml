@@ -7,7 +7,6 @@ services:
       - DD_AGENT_HOST=datadog      
     volumes:
       - .:/usr/src/node-app
-    
     depends_on:
       - redis
 
@@ -20,6 +19,20 @@ services:
       com.datadoghq.tags.service: "jc-backend_redis"
       com.datadoghq.ad.check_names: '["redisdb"]'
       com.datadoghq.ad.init_configs: '[{}]'
+  
+  squid:
+    image: sameersbn/squid:3.5.27-2
+    ports:
+      - "3128:3128"
+    volumes:
+      - ./squid/squid.conf:/etc/squid/squid.conf:ro
+      - ./squid/log:/var/log/squid
+
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
 
 #  datadog:
 #    image: datadog/agent

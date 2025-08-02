@@ -236,7 +236,7 @@ async function launchCrawler(emitter, clientId) {
     return crawler
 }
 async function launchHeadedCrawler(emitter, clientId, vncConfig) {
-    const { display } = vncConfig || {}
+    const { display, listingURL } = vncConfig || {}
     const x11Auth = `/tmp/.Xauthority-${clientId}`
 
     try {
@@ -256,6 +256,8 @@ async function launchHeadedCrawler(emitter, clientId, vncConfig) {
                         '--disable-software-rasterizer',
                         '--window-position=0,0',
                         '--window-size=1920,1080',
+                        '--proxy-server=http://squid:3128',
+                        `--app=${listingURL}`,
                     ],
                     env: {
                         DISPLAY: `:${display}`,

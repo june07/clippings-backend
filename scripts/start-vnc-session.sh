@@ -36,7 +36,7 @@ websockify $WEB_PORT localhost:$VNC_PORT > /tmp/websockify-${CLIENT_ID}.log 2>&1
 # 4. Start browser inside virtual display
 echo "Starting Chromium inside virtual display..."
 #DISPLAY=$DISPLAY $BROWSER --disable-gpu --no-sandbox --disable-software-rasterizer --window-position=0,0 --window-size=1280,720 https://craigslist.com > /tmp/chromium-${CLIENT_ID}.log 2>&1 &
-DISPLAY=$DISPLAY $BROWSER --no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-accelerated-2d-canvas --no-zygote --single-process --disable-gpu --disable-software-rasterizer --window-position=0,0 --window-size=1280,720 --app=https://sfbay.craigslist.org/eby/bks/d/hayward-crane-and-rigging-heavy-lift/7863967077.html > /tmp/chromium-${CLIENT_ID}.log 2>&1 &
+DISPLAY=$DISPLAY $BROWSER --no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-accelerated-2d-canvas --no-zygote --single-process --disable-gpu --disable-software-rasterizer --window-position=0,0 --window-size=1280,720 --proxy-server=http://squid:3128 https://sfbay.craigslist.org/eby/bks/d/hayward-crane-and-rigging-heavy-lift/7863967077.html > /tmp/chromium-${CLIENT_ID}.log 2>&1 &
 
 # Done
 echo "✅ VNC test session started!"

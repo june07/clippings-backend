@@ -1,3 +1,5 @@
+const { NODE_ENV } = process.env
+
 module.exports = ({ emitter, logger, namespace }) => async function workerRequestHandler({ request, response, page, log }) {
     if (!response.ok()) {
         emitter.emit(
@@ -26,46 +28,44 @@ module.exports = ({ emitter, logger, namespace }) => async function workerReques
     const imageUrls = []
     let emailAddress, detectedCaptcha = false
 
-    /**
-     * 
-     * 
-    log.info(`Processing image urls for ${request.url}...`)
+    /** skip images in dev */
+    if (NODE_ENV === 'production') {
+        log.info(`Processing image urls for ${request.url}...`)
 
-    await gallery.hover()
-    await gallery.click()
-    await page.waitForSelector('.gallery.big')
+        await gallery.hover()
+        await gallery.click()
+        await page.waitForSelector('.gallery.big')
 
-    imageUrls.push(
-        await page.evaluate(() => {
-            const imageElements = document.querySelectorAll('.gallery.big .slide img')
-            const urls = []
+        imageUrls.push(
+            await page.evaluate(() => {
+                const imageElements = document.querySelectorAll('.gallery.big .slide img')
+                const urls = []
 
-            // Loop through the image elements and extract the 'src' attribute
-            imageElements.forEach(img => {
-                const url = img.getAttribute('src')
-                urls.push(url)
+                // Loop through the image elements and extract the 'src' attribute
+                imageElements.forEach(img => {
+                    const url = img.getAttribute('src')
+                    urls.push(url)
+                })
+
+                return urls
             })
+        )
 
-            return urls
-        })
-    )
+        try {
+            await page.waitForSelector('.lbclose')
 
-    try {
-        await page.waitForSelector('.lbclose')
+            // Add a human-like delay before closing
+            const delay = 500 + Math.random() * 1500  // between 500ms and 2000ms
+            log.info(`Waiting ${Math.round(delay)}ms before closing lightbox...`)
+            await page.waitForTimeout(delay)
 
-        // Add a human-like delay before closing
-        const delay = 500 + Math.random() * 1500  // between 500ms and 2000ms
-        log.info(`Waiting ${Math.round(delay)}ms before closing lightbox...`)
-        await page.waitForTimeout(delay)
+            await page.click('.lbclose')
+        } catch (error) {
+            log.info('No lightbox close button detected within timeout.')
+        }
 
-        await page.click('.lbclose')
-    } catch (error) {
-        log.info('No lightbox close button detected within timeout.')
+        log.info(`Processed image urls for ${request.url}...`)
     }
-
-    log.info(`Processed image urls for ${request.url}...`)
-
-    */
 
     try {
         log.info(`Processing reply button for ${request.url}...`)

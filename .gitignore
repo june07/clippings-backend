@@ -7,3 +7,5 @@ key.pem
 storage
 redis/*
 .Xauthority-7863967077
+squid/log/access.log
+squid/log/cache.log

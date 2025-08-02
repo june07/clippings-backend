@@ -16,7 +16,7 @@ module.exports = ({ emitter, logger, namespace }) => async function workerReques
         await page.close()
         return
     }
-
+    
     const { options } = request.userData
 
     log.info(`Re-crawling ${request.url}...`)
