@@ -102,8 +102,8 @@ module.exports = ({ emitter, logger, namespace }) => async function workerReques
         }
     }
 
-    log.info(JSON.stringify({ url: request.url, html, imageUrls: imageUrls.flat() }, null, 4))
-    logger.debug({ namespace, message: JSON.stringify({ url: request.url, html, imageUrls: imageUrls.flat() }) })
+    log.info(JSON.stringify({ url: request.url, imageUrls: imageUrls.flat() }, null, 4))
+    logger.debug({ namespace, message: JSON.stringify({ url: request.url, imageUrls: imageUrls.flat() }) })
 
     const buffer = await page.screenshot()
 
