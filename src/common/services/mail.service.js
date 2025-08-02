@@ -52,6 +52,7 @@ async function sendTransacEmail(type, options) {
             const allContacts = await contactsApiInstance.getContactsFromList(14)
             const nonBlacklisted = allContacts.body.contacts?.filter(contact => !contact.emailBlacklisted) || []
 
+            const date = new Date().toLocaleDateString()
             const sendSmtpEmail = new Brevo.SendSmtpEmail()
             const emailPayload = {
                 bcc: config.NODE_ENV === 'production'
@@ -59,8 +60,12 @@ async function sendTransacEmail(type, options) {
                     : [{ email: config.TEST_EMAIL_RECIPIENT }],
                 templateId: 16,
                 params: {
+                    json: JSON.stringify({
+                        date,
+                        ads: options.ads
+                    }),
                     ads: options.ads,
-                    date: new Date().toLocaleDateString()
+                    date
                 },
             }
 
