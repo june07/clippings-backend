@@ -1,6 +1,7 @@
 const fs = require('fs')
 const { exec } = require('child_process')
 const { promisify } = require('util')
+const { glob } = require('glob')
 const { until } = require('async')
 const execAsync = promisify(exec)
 const { EventEmitter } = require('events')
@@ -21,7 +22,9 @@ const {
     TTL_SECONDS = 600,
     DISPLAY_OFFSET = 1, // display :1 for first session
     VNC_PORT_RANGE = { min: 5100, max: 5200 },
-    WEB_PORT_RANGE = { min: 6100, max: 6200 }
+    WEB_PORT_RANGE = { min: 6100, max: 6200 },
+    IMMEDIATE_CLEANUP = false,
+    FILE_AGE_SECONDS = 60 * 10
 } = process.env
 
 class CrawlerWorker extends EventEmitter {
@@ -474,12 +477,50 @@ async function cleanupX11Server({ display, vncPort, webPort, clientId }) {
 
     const filesToRemove = [x11Auth, x11Log, x11vncLog, websockifyLog]
 
-    for (const file of filesToRemove) {
-        try {
-            await fs.promises.unlink(file)
-        } catch (e) {
-            if (e.code !== 'ENOENT') {
-                console.warn(`Could not remove file ${file}:`, e.message)
+    if (IMMEDIATE_CLEANUP) {
+        for (const file of filesToRemove) {
+            try {
+                await fs.promises.unlink(file)
+            } catch (e) {
+                if (e.code !== 'ENOENT') {
+                    console.warn(`Could not remove file ${file}:`, e.message)
+                }
+            }
+        }
+    } else {
+        logger.info('Time based cleanup of old files, to configure immediate cleanup set IMMEDIATE_CLEANUP to true')
+        const patterns = [
+            '/tmp/.Xauthority-*',
+            '/tmp/xvfb-*.log',
+            '/tmp/x11vnc-*.log',
+            '/tmp/websockify-*.log'
+        ]
+
+        const now = Date.now()
+
+        for (const pattern of patterns) {
+            try {
+                const files = await glob(pattern)
+
+                for (const file of files) {
+                    try {
+                        const { mtime } = await stat(file)
+                        const ageSeconds = (now - mtime.getTime()) / 1000
+
+                        if (ageSeconds > FILE_AGE_SECONDS) {
+                            await unlink(file)
+                            console.log(`Removed old file: ${file}`)
+                        } else {
+                            console.log(`Skipped recent file: ${file} (${Math.round(ageSeconds)}s old)`)
+                        }
+                    } catch (err) {
+                        if (err.code !== 'ENOENT') {
+                            console.warn(`Could not stat/remove file ${file}:`, err.message)
+                        }
+                    }
+                }
+            } catch (globErr) {
+                console.warn(`Failed to match files for pattern "${pattern}":`, globErr.message)
             }
         }
     }
