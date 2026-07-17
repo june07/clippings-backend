@@ -1,4 +1,4 @@
-FROM node:current
+FROM node:lts
 
 ENV NODE_ENV production
 ENV TZ="America/Los_Angeles"
