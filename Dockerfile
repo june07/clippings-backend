@@ -1,6 +1,6 @@
 FROM node:lts
 
-ENV NODE_ENV production
+ENV NODE_ENV="production"
 ENV TZ="America/Los_Angeles"
 
 RUN apt-get update && \
