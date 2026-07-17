@@ -28,9 +28,9 @@ COPY --chown=node:node . .
 
 USER root
 
-RUN npm ci \
-    && npx playwright install chromium \
-    && npx playwright install-deps chromium
+RUN npm ci
+RUN npx playwright install chromium
+RUN npx playwright install-deps chromium
 
 USER node
 
