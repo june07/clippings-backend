@@ -64,7 +64,7 @@ function router(io) {
             callback(archive)
         }).on('archive', async (listingURL) => {
             const listingUUID = uuidv5(listingURL, uuidv5.URL)
-            const listingPid = listingURL?.match(/\/([^\/]*)\.htm/)?.[1]
+            const listingPid = listingURL?.match(/\/([^\/]*?)(?:\.(htm|html))?$/)?.[1]
             if (!listingPid) {
                 return new Error('invalid pid')
             }

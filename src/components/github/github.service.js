@@ -25,7 +25,7 @@ async function downloadImage(url) {
 }
 async function saveAdToPages(options) {
     const { url, html, imageUrls } = options
-    const pid = url.match(/\/([^\/]*)\.html/)[1]
+    const pid = url.match(/\/([^\/]*?)(?:\.(htm|html))?$/)?.[1]
     const octokit = new Octokit({
         auth: GITHUB_TOKEN,
     })
